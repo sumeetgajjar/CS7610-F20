@@ -10,11 +10,9 @@ ENV PATH="/cmake-3.17.4-Linux-x86_64/bin:${PATH}"
 
 RUN mkdir -p prj0/build
 COPY *.h *.h.in *.cpp hostfile CMakeLists.txt prj0/
-WORKDIR prj0/build
 
 ARG UDP_PORT=7610
-ARG HOST_FILE_PATH='"/prj0/hostfile"'
-RUN cmake .. -DUDP_PORT=$UDP_PORT -DHOST_FILE_PATH=$HOST_FILE_PATH && \
-    make
+WORKDIR prj0/build
+RUN cmake .. -DUDP_PORT=$UDP_PORT && make
 
 ENTRYPOINT ./lab0

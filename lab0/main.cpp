@@ -17,19 +17,19 @@ public:
         return std::string(hostname);
     }
 
-    static std::vector<std::string> readHostFile() {
+    static std::vector<std::string> readHostFile(std::string hostFilePath) {
         std::vector<std::string> hostnames;
         std::set<std::string> uniqueHostnames;
 
-        std::ifstream hostfile(HOST_FILE_PATH);
+        std::ifstream hostFile(hostFilePath);
         std::string line;
-        while (std::getline(hostfile, line)) {
+        while (std::getline(hostFile, line)) {
             const std::string &hostname = line;
             if (uniqueHostnames.insert(hostname).second) {
                 hostnames.push_back(hostname);
             }
         }
-        hostfile.close();
+        hostFile.close();
         return hostnames;
     }
 
@@ -53,6 +53,19 @@ public:
         }
         throw std::runtime_error("cannot find current hostname: " + currentHostname + " in the hostfile");
     }
+
+    static std::string parseHostFileFromCmdArguments(int argc, char **argv) {
+        if (argc != 3) {
+            throw std::invalid_argument("Invalid usage, correct usage is: ./lab0 -h <hostfile>");
+        }
+
+        bool hostFilePresent = std::string(argv[1]) == "-h";
+        if (!hostFilePresent) {
+            throw std::invalid_argument("Invalid usage, correct usage is: ./lab0 -h <hostfile>");
+        }
+
+        return std::string(argv[2]);
+    }
 };
 
 class Receiver {
@@ -63,14 +76,9 @@ class Sender {
 
 };
 
-int main(int argc, char** argv) {
-    std::cout << "You have entered " << argc
-         << " arguments:" << "\n";
-
-    for (int i = 0; i < argc; ++i)
-        std::cout << argv[i] << "\n";
-
-    const auto hostnames = Utils::readHostFile();
+int main(int argc, char **argv) {
+    const auto hostFilePath = Utils::parseHostFileFromCmdArguments(argc, argv);
+    const auto hostnames = Utils::readHostFile(hostFilePath);
     const auto currentHostname = Utils::getCurrentHostname();
     const auto otherProcessesHostnames = Utils::getHostnameOfOthers(hostnames, currentHostname);
     const int currentProcessNumber = Utils::getCurrentProcessNumber(hostnames, currentHostname);
