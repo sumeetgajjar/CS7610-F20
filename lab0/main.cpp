@@ -83,14 +83,6 @@ int main(int argc, char **argv) {
     const auto otherProcessesHostnames = Utils::getHostnameOfOthers(hostnames, currentHostname);
     const int currentProcessNumber = Utils::getCurrentProcessNumber(hostnames, currentHostname);
 
-    for (const auto hostname : hostnames) {
-        std::cout << hostname.length() << " " << hostname << std::endl;
-    }
-    std::cout << "Process Number -> " << currentProcessNumber << std::endl;
-
-    for (const auto hostname: otherProcessesHostnames) {
-        std::cout << hostname.length() << " " << hostname << std::endl;
-    }
-
+    std::cout << currentHostname << " -> Process Number -> " << currentProcessNumber << std::endl;
     return 0;
 }

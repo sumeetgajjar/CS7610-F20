@@ -8,11 +8,11 @@ RUN wget --no-check-certificate https://github.com/Kitware/CMake/releases/downlo
 
 ENV PATH="/cmake-3.17.4-Linux-x86_64/bin:${PATH}"
 
+ARG UDP_PORT=7610
 RUN mkdir -p prj0/build
 COPY *.h *.h.in *.cpp hostfile CMakeLists.txt prj0/
 
-ARG UDP_PORT=7610
 WORKDIR prj0/build
 RUN cmake .. -DUDP_PORT=$UDP_PORT && make
 
-ENTRYPOINT ./lab0
+ENTRYPOINT ["/prj0/build/lab0"]
