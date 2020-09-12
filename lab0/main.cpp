@@ -63,7 +63,13 @@ class Sender {
 
 };
 
-int main() {
+int main(int argc, char** argv) {
+    std::cout << "You have entered " << argc
+         << " arguments:" << "\n";
+
+    for (int i = 0; i < argc; ++i)
+        std::cout << argv[i] << "\n";
+
     const auto hostnames = Utils::readHostFile();
     const auto currentHostname = Utils::getCurrentHostname();
     const auto otherProcessesHostnames = Utils::getHostnameOfOthers(hostnames, currentHostname);
