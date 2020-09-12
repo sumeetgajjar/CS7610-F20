@@ -17,7 +17,7 @@ public:
         return std::string(hostname);
     }
 
-    static std::vector<std::string> readHostFile(std::string hostFilePath) {
+    static std::vector<std::string> readHostFile(const std::string &hostFilePath) {
         std::vector<std::string> hostnames;
         std::set<std::string> uniqueHostnames;
 
@@ -33,10 +33,10 @@ public:
         return hostnames;
     }
 
-    static std::vector<std::string> getHostnameOfOthers(std::vector<std::string> hostnames,
-                                                        std::string currentHostname) {
+    static std::vector<std::string> getHostnameOfOthers(const std::vector<std::string> &hostnames,
+                                                        const std::string &currentHostname) {
         std::vector<std::string> otherHostnames;
-        for (const auto hostname: hostnames) {
+        for (const auto &hostname: hostnames) {
             if (hostname != currentHostname) {
                 otherHostnames.push_back(hostname);
             }
@@ -44,8 +44,8 @@ public:
         return otherHostnames;
     }
 
-    static int getCurrentProcessNumber(std::vector<std::string> hostnames,
-                                       std::string currentHostname) {
+    static int getCurrentProcessNumber(const std::vector<std::string> &hostnames,
+                                       const std::string &currentHostname) {
         for (int i = 0; i < hostnames.size(); i++) {
             if (hostnames[i] == currentHostname) {
                 return i + 1;
