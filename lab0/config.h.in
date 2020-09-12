@@ -1,0 +1,2 @@
+#define UDP_PORT @UDP_PORT@
+#define HOST_FILE_PATH @HOST_FILE_PATH@
