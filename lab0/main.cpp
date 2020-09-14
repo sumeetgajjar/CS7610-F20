@@ -1,5 +1,5 @@
 #include <iostream>
-#include "Utils.h"
+#include "utils.h"
 
 using namespace lab0;
 

@@ -8,7 +8,7 @@
 #include <set>
 #include <fstream>
 #include <unistd.h>
-#include "Utils.h"
+#include "utils.h"
 
 namespace lab0 {
 
