@@ -1,1 +1,6 @@
+#ifndef CONFIG_HEADER_GUARD
+#define CONFIG_HEADER_GUARD
+
 #define UDP_PORT @UDP_PORT@
+
+#endif
