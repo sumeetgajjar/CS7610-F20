@@ -12,7 +12,7 @@
 
 namespace lab0 {
 
-    std::string Utils::getCurrentContainerName() {
+    std::string Utils::getCurrentContainerHostname() {
         // TODO: change the implementation to use the container name, wait for rahul to confirm
         char hostname[HOST_NAME_MAX];
         int errorCode = gethostname(hostname, HOST_NAME_MAX);
@@ -38,21 +38,21 @@ namespace lab0 {
         return hostnames;
     }
 
-    std::vector<std::string> Utils::getOtherContainerNames(const std::vector<std::string> &hostnames,
-                                                           const std::string &currentHostname) {
-        std::vector<std::string> otherHostnames;
-        for (const auto &hostname: hostnames) {
+    std::vector<std::string> Utils::getPeerContainerHostnames(const std::vector<std::string> &allHostnames,
+                                                              const std::string &currentHostname) {
+        std::vector<std::string> peerHostnames;
+        for (const auto &hostname: allHostnames) {
             if (hostname != currentHostname) {
-                otherHostnames.push_back(hostname);
+                peerHostnames.push_back(hostname);
             }
         }
-        return otherHostnames;
+        return peerHostnames;
     }
 
-    int Utils::getCurrentProcessNumber(const std::vector<std::string> &hostnames,
-                                       const std::string &currentHostname) {
-        for (int i = 0; i < hostnames.size(); i++) {
-            if (hostnames[i] == currentHostname) {
+    int Utils::getProcessIdentifier(const std::vector<std::string> &allHostnames,
+                                    const std::string &currentHostname) {
+        for (int i = 0; i < allHostnames.size(); i++) {
+            if (allHostnames[i] == currentHostname) {
                 return i + 1;
             }
         }

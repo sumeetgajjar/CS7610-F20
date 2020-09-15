@@ -10,6 +10,7 @@
 #include <netdb.h>
 
 namespace lab0 {
+
     class Sender {
     private:
         std::string serverHost, serverPort;

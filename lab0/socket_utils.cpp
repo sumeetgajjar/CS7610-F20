@@ -6,10 +6,12 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <glog/logging.h>
+#include <climits>
 
 #include "socket_utils.h"
 
 namespace lab0 {
+
 
     void Sender::initSocket() {
         struct addrinfo hints;
@@ -42,7 +44,7 @@ namespace lab0 {
         LOG(INFO) << "sending message: " << message;
         if (int numbytes = sendto(socketFD, message.c_str(), message.size(), 0, serverAddrInfo->ai_addr,
                                   serverAddrInfo->ai_addrlen);
-                numbytes < 0) {
+                numbytes == -1) {
             LOG(ERROR) << "error(" << numbytes << ") occurred while sending message: " << message;
         } else {
             LOG(INFO) << "sent to " << serverHost << ", bytes: " << numbytes << ", message: " << message;
@@ -91,14 +93,6 @@ namespace lab0 {
         freeaddrinfo(serverInfoList);
     }
 
-    void *get_in_addr(struct sockaddr *sa) {
-        if (sa->sa_family == AF_INET) {
-            return &(((struct sockaddr_in *) sa)->sin_addr);
-        }
-
-        return &(((struct sockaddr_in6 *) sa)->sin6_addr);
-    }
-
     std::pair<std::string, std::string> Receiver::receiveMessage() {
         struct sockaddr_storage their_addr;
         socklen_t addr_len;
@@ -108,16 +102,21 @@ namespace lab0 {
         memset(&buffer, 0, MAX_BUFFER_SIZE);
         if (int numbytes = recvfrom(sockfd, buffer, MAX_BUFFER_SIZE - 1, 0, (struct sockaddr *) &their_addr,
                                     &addr_len);
-                numbytes < 0) {
+                numbytes == -1) {
             std::string errorMessage = "error(" + std::to_string(numbytes) + ") occurred while receiving data";
             LOG(ERROR) << errorMessage;
             throw std::runtime_error(errorMessage);
         } else {
-            char s[INET6_ADDRSTRLEN];
-            auto receivedFrom = inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *) &their_addr), s,
-                                          sizeof(s));
             buffer[numbytes] = '\0';
             std::string message(buffer);
+
+            char host[HOST_NAME_MAX + 1];
+            if (int rv = getnameinfo((struct sockaddr *) &their_addr, addr_len, host, sizeof(host), NULL, NULL, 0);
+                    rv != 0) {
+                LOG(ERROR) << "could not get the name of the sender, error code: " << rv << ", error message: "
+                           << gai_strerror(rv);
+            }
+            std::string receivedFrom(host);
             LOG(INFO) << "received:" << numbytes << " bytes, from: " << receivedFrom << ", message: " << message;
             return std::pair<std::string, std::string>(message, receivedFrom);
         }

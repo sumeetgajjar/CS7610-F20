@@ -12,15 +12,15 @@
 namespace lab0 {
     class Utils {
     public:
-        static std::string getCurrentContainerName();
+        static std::string getCurrentContainerHostname();
 
         static std::vector<std::string> readHostFile(const std::string &hostFilePath);
 
-        static std::vector<std::string> getOtherContainerNames(const std::vector<std::string> &hostnames,
-                                                               const std::string &currentHostname);
+        static std::vector<std::string> getPeerContainerHostnames(const std::vector<std::string> &allHostnames,
+                                                                  const std::string &currentHostname);
 
-        static int getCurrentProcessNumber(const std::vector<std::string> &hostnames,
-                                           const std::string &currentHostname);
+        static int getProcessIdentifier(const std::vector<std::string> &allHostnames,
+                                        const std::string &currentHostname);
 
         static std::string parseHostFileFromCmdArguments(int argc, char **argv);
     };
