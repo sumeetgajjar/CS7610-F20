@@ -27,6 +27,30 @@ namespace lab0 {
 
         void closeConnection();
     };
+
+    class Receiver {
+    private:
+        static const int MAX_BUFFER_SIZE = 100;
+        int sockfd;
+        struct addrinfo *serverAddrInfo;
+        std::string serverPort;
+        char buffer[MAX_BUFFER_SIZE];
+
+        void initSocket();
+
+    public:
+        Receiver(int port) : serverPort(std::to_string(port)) {
+            initSocket();
+        }
+
+        /**
+         * Blocks till a message is received
+         * @return Returns a pair of (received message, hostname of the sender)
+         */
+        std::pair<std::string, std::string> receiveMessage();
+
+        void closeConnection();
+    };
 }
 
 #endif //LAB0_SOCKET_UTILS_H
