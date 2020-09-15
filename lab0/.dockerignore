@@ -5,3 +5,4 @@
 !*.h.in
 !hostfile
 !CMakeLists.txt
+!install_dependencies.sh

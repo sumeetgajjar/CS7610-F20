@@ -7,8 +7,11 @@ if (NOT DEFINED UDP_PORT)
     set(UDP_PORT 7610)
 endif()
 
+find_package(glog 0.4.0 REQUIRED)
+
 configure_file(hostfile hostfile COPYONLY)
 configure_file(config.h.in config.h)
 include_directories("${PROJECT_BINARY_DIR}")
 
-add_executable(lab0 main.cpp utils.cpp utils.h)
+add_executable(lab0 main.cpp utils.cpp utils.h socket_utils.cpp socket_utils.h)
+target_link_libraries(lab0 glog::glog)
