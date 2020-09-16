@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 #include <algorithm>
 #include <utility>
+#include <memory>
 #include "socket_utils.h"
 #include "heartbeat.h"
 #include "config.h"
@@ -17,7 +18,7 @@ namespace lab0 {
     std::unordered_set<std::string> HeartbeatSender::aliveMessageReceivers;
     std::mutex HeartbeatSender::ackMessageMutex;
     std::unordered_set<std::string> HeartbeatSender::ackMessageReceivers;
-    std::unordered_map<std::string, UDPSender> HeartbeatSender::udpSenders;
+    std::unordered_map<std::string, std::unique_ptr<UDPSender>> HeartbeatSender::udpSenders;
     std::atomic_bool HeartbeatSender::stopAliveMessageLoop = false, HeartbeatSender::stopAckMessageLoop = false;
 
     void HeartbeatSender::startSendingAliveMessages() {
@@ -26,7 +27,7 @@ namespace lab0 {
                 std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
                 for (auto &hostname : aliveMessageReceivers) {
                     //TODO: resolve this
-                    udpSenders[hostname].sendMessage(aliveMessage);
+                    udpSenders[hostname].get()->sendMessage(aliveMessage);
                 }
             }
             sleep(messageDelay);
@@ -35,7 +36,7 @@ namespace lab0 {
 
     void HeartbeatSender::addAliveReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
-        udpSenders.insert(std::make_pair(hostname, UDPSender(hostname, UDP_PORT)));
+        udpSenders.insert(std::make_pair(hostname, std::make_unique<UDPSender>(UDPSender(hostname, UDP_PORT))));
         aliveMessageReceivers.insert(hostname);
     }
 
@@ -56,7 +57,7 @@ namespace lab0 {
             {
                 std::lock_guard<std::mutex> lockGuard(ackMessageMutex);
                 for (auto &hostname : ackMessageReceivers) {
-                    udpSenders[hostname].sendMessage(ackMessage);
+                    udpSenders[hostname].get()->sendMessage(ackMessage);
                 }
             }
             sleep(messageDelay);

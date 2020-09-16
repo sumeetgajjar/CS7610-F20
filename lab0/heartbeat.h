@@ -20,7 +20,7 @@ namespace lab0 {
         static std::unordered_set<std::string> aliveMessageReceivers;
         static std::mutex ackMessageMutex;
         static std::unordered_set<std::string> ackMessageReceivers;
-        static std::unordered_map<std::string, UDPSender> udpSenders;
+        static std::unordered_map<std::string, std::unique_ptr<UDPSender>> udpSenders;
         static std::atomic_bool stopAliveMessageLoop, stopAckMessageLoop;
         static const int messageDelay = 2;
     public:
