@@ -20,13 +20,13 @@ int main(int argc, char **argv) {
     std::cout << currentContainerHostname << " -> Process Number -> " << currentProcessIdentifier << std::endl;
 
     std::thread r([]() {
-        Receiver receiver(1234);
+        UDPReceiver receiver(1234);
         auto pair = receiver.receiveMessage();
         receiver.closeConnection();
     });
     sleep(2);
     std::thread s([]() {
-        Sender sender("localhost", 1234);
+        UDPSender sender("localhost", 1234);
         sender.sendMessage("Hello from sender");
         sender.closeConnection();
     });

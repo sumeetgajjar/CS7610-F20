@@ -11,36 +11,37 @@
 
 namespace lab0 {
 
-    class Sender {
+    class UDPSender {
     private:
-        std::string serverHost, serverPort;
+        const std::string serverHost, serverPort;
         int socketFD;
         struct addrinfo *serverInfoList, *serverAddrInfo;
 
         void initSocket();
 
     public:
-        Sender(std::string host, int port) : serverHost(std::move(host)), serverPort(std::to_string(port)) {
+        UDPSender(std::string host, int port) : serverHost(std::move(host)), serverPort(std::to_string(port)) {
             initSocket();
         };
+
+        std::string getServerHost();
 
         void sendMessage(const std::string &message);
 
         void closeConnection();
     };
 
-    class Receiver {
+    class UDPReceiver {
     private:
         static const int MAX_BUFFER_SIZE = 100;
         int sockfd;
-        struct addrinfo *serverAddrInfo;
         std::string serverPort;
         char buffer[MAX_BUFFER_SIZE];
 
         void initSocket();
 
     public:
-        Receiver(int port) : serverPort(std::to_string(port)) {
+        UDPReceiver(int port) : serverPort(std::to_string(port)) {
             initSocket();
         }
 

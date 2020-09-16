@@ -50,13 +50,13 @@ namespace lab0 {
     }
 
     int Utils::getProcessIdentifier(const std::vector<std::string> &allHostnames,
-                                    const std::string &currentHostname) {
+                                    const std::string &hostname) {
         for (int i = 0; i < allHostnames.size(); i++) {
-            if (allHostnames[i] == currentHostname) {
+            if (allHostnames[i] == hostname) {
                 return i + 1;
             }
         }
-        throw std::runtime_error("cannot find current hostname: " + currentHostname + " in the hostfile");
+        throw std::runtime_error("cannot find current hostname: " + hostname + " in the hostfile");
     }
 
     std::string Utils::parseHostFileFromCmdArguments(int argc, char **argv) {

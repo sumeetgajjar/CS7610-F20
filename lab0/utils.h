@@ -20,7 +20,7 @@ namespace lab0 {
                                                                   const std::string &currentHostname);
 
         static int getProcessIdentifier(const std::vector<std::string> &allHostnames,
-                                        const std::string &currentHostname);
+                                        const std::string &hostname);
 
         static std::string parseHostFileFromCmdArguments(int argc, char **argv);
     };

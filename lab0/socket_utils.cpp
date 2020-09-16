@@ -13,7 +13,7 @@
 namespace lab0 {
 
 
-    void Sender::initSocket() {
+    void UDPSender::initSocket() {
         struct addrinfo hints;
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC;
@@ -40,7 +40,7 @@ namespace lab0 {
         }
     }
 
-    void Sender::sendMessage(const std::string &message) {
+    void UDPSender::sendMessage(const std::string &message) {
         LOG(INFO) << "sending message: " << message;
         if (int numbytes = sendto(socketFD, message.c_str(), message.size(), 0, serverAddrInfo->ai_addr,
                                   serverAddrInfo->ai_addrlen);
@@ -51,13 +51,17 @@ namespace lab0 {
         }
     }
 
-    void Sender::closeConnection() {
+    void UDPSender::closeConnection() {
         freeaddrinfo(serverInfoList);
         close(socketFD);
     }
 
-    void Receiver::initSocket() {
-        struct addrinfo hints, *serverInfoList;
+    std::string UDPSender::getServerHost() {
+        return serverHost;
+    }
+
+    void UDPReceiver::initSocket() {
+        struct addrinfo hints, *serverInfoList, *serverAddrInfo;
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
         hints.ai_socktype = SOCK_DGRAM;
@@ -93,7 +97,7 @@ namespace lab0 {
         freeaddrinfo(serverInfoList);
     }
 
-    std::pair<std::string, std::string> Receiver::receiveMessage() {
+    std::pair<std::string, std::string> UDPReceiver::receiveMessage() {
         struct sockaddr_storage their_addr;
         socklen_t addr_len;
         addr_len = sizeof(their_addr);
@@ -111,7 +115,7 @@ namespace lab0 {
             std::string message(buffer);
 
             char host[HOST_NAME_MAX + 1];
-            if (int rv = getnameinfo((struct sockaddr *) &their_addr, addr_len, host, sizeof(host), NULL, NULL, 0);
+            if (int rv = getnameinfo((struct sockaddr *) &their_addr, addr_len, host, sizeof(host), NULL, 0, 0);
                     rv != 0) {
                 LOG(ERROR) << "could not get the name of the sender, error code: " << rv << ", error message: "
                            << gai_strerror(rv);
@@ -122,7 +126,7 @@ namespace lab0 {
         }
     }
 
-    void Receiver::closeConnection() {
+    void UDPReceiver::closeConnection() {
         close(sockfd);
     }
 }
