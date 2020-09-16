@@ -7,22 +7,25 @@
 #include <vector>
 #include <set>
 #include <fstream>
+#include <glog/logging.h>
 #include <unistd.h>
 #include "utils.h"
 
 namespace lab0 {
 
     std::string Utils::getCurrentContainerHostname() {
-        // TODO: change the implementation to use the container name, wait for rahul to confirm
+        LOG(INFO) << "getting current host";
         char hostname[HOST_NAME_MAX];
         int errorCode = gethostname(hostname, HOST_NAME_MAX);
         if (errorCode) {
-            throw std::runtime_error("Cannot find the container name");
+            LOG(FATAL) << "Cannot find the current host name";
         }
+        LOG(INFO) << "current host name: " << hostname;
         return std::string(hostname);
     }
 
     std::vector<std::string> Utils::readHostFile(const std::string &hostFilePath) {
+        LOG(INFO) << "reading host file, path: " << hostFilePath;
         std::vector<std::string> hostnames;
         std::set<std::string> uniqueHostnames;
 
@@ -35,40 +38,48 @@ namespace lab0 {
             }
         }
         hostFile.close();
+        LOG(INFO) << hostnames.size() << " hosts found";
         return hostnames;
     }
 
     std::vector<std::string> Utils::getPeerContainerHostnames(const std::vector<std::string> &allHostnames,
                                                               const std::string &currentHostname) {
+        LOG(INFO) << "getting peer container host names";
         std::vector<std::string> peerHostnames;
         for (const auto &hostname: allHostnames) {
             if (hostname != currentHostname) {
                 peerHostnames.push_back(hostname);
             }
         }
+        LOG(INFO) << peerHostnames.size() << " peers found";
         return peerHostnames;
     }
 
     int Utils::getProcessIdentifier(const std::vector<std::string> &allHostnames,
                                     const std::string &hostname) {
+        LOG(INFO) << "getting process identifier";
         for (int i = 0; i < allHostnames.size(); i++) {
             if (allHostnames[i] == hostname) {
+                int processIdentifier = i + 1;
+                LOG(INFO) << "process identifier of " << hostname << " -> " << processIdentifier;
                 return i + 1;
             }
         }
-        throw std::runtime_error("cannot find current hostname: " + hostname + " in the hostfile");
+        LOG(FATAL) << "cannot find process identifier for : " + hostname;
     }
 
     std::string Utils::parseHostFileFromCmdArguments(int argc, char **argv) {
+        LOG(INFO) << "parsing cmd arguments";
         if (argc != 3) {
-            throw std::invalid_argument("Invalid usage, correct usage is: ./lab0 -h <hostfile>");
+            LOG(FATAL) << "Invalid usage, correct usage is: ./lab0 -h <hostfile>";
         }
 
         bool hostFilePresent = std::string(argv[1]) == "-h";
         if (!hostFilePresent) {
-            throw std::invalid_argument("Invalid usage, correct usage is: ./lab0 -h <hostfile>");
+            LOG(FATAL) << "Invalid usage, correct usage is: ./lab0 -h <hostfile>";
         }
 
+        LOG(INFO) << "cmd arguments parsed";
         return std::string(argv[2]);
     }
 }

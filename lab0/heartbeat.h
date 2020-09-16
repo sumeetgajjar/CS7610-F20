@@ -29,15 +29,15 @@ namespace lab0 {
 
         static void startSendingAliveMessages();
 
-        static void addToAliveReceiverList(const std::string &hostname);
+        static void addToAliveMessageReceiverList(const std::string &hostname);
 
-        static void removeFromAliveReceiverList(const std::string &hostname);
+        static void removeFromAliveMessageReceiverList(const std::string &hostname);
 
-        static void startSendingAckMessages();
+        static void sendingAckMessages();
 
-        static void addToAckReceiverList(const std::string &hostname);
+        static void addToAckMessageReceiverList(const std::string &hostname);
 
-        static void removeFromAckReceiverList(const std::string &hostname);
+        static void removeFromAckMessageReceiverList(const std::string &hostname);
     };
 
     class HeartbeatReceiver {

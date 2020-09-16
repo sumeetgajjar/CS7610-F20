@@ -22,25 +22,30 @@ namespace lab0 {
     std::atomic_bool HeartbeatSender::stopAliveMessageLoop = false, HeartbeatSender::stopAckMessageLoop = false;
 
     void HeartbeatSender::startSendingAliveMessages() {
+        LOG(INFO) << "starting startSendingAliveMessages";
         while (!stopAliveMessageLoop) {
             {
                 std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
+                LOG(INFO) << "sending alive messages to " << aliveMessageReceivers.size() << " receivers";
                 for (auto &hostname : aliveMessageReceivers) {
                     //TODO: resolve this
                     udpSenders[hostname].get()->sendMessage(aliveMessage);
                 }
             }
+            LOG(INFO) << "sleeping in startSendingAliveMessages";
             sleep(messageDelay);
         }
+        LOG(INFO) << "stopping startSendingAliveMessages";
     }
 
-    void HeartbeatSender::addToAliveReceiverList(const std::string &hostname) {
+    void HeartbeatSender::addToAliveMessageReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
+        LOG(INFO) << "adding " << hostname << " to aliveMessageReceivers";
         udpSenders.insert(std::make_pair(hostname, std::make_unique<UDPSender>(UDPSender(hostname, UDP_PORT))));
         aliveMessageReceivers.insert(hostname);
     }
 
-    void HeartbeatSender::removeFromAliveReceiverList(const std::string &hostname) {
+    void HeartbeatSender::removeFromAliveMessageReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
         if (aliveMessageReceivers.erase(hostname) == 0) {
             LOG(ERROR) << "Cannot find UDPSender for host: " << hostname << " in broadcast list";
@@ -52,7 +57,8 @@ namespace lab0 {
         }
     }
 
-    void HeartbeatSender::startSendingAckMessages() {
+    void HeartbeatSender::sendingAckMessages() {
+        // TODO: only send once
         while (!stopAckMessageLoop) {
             {
                 std::lock_guard<std::mutex> lockGuard(ackMessageMutex);
@@ -64,12 +70,12 @@ namespace lab0 {
         }
     }
 
-    void HeartbeatSender::addToAckReceiverList(const std::string &hostname) {
+    void HeartbeatSender::addToAckMessageReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(ackMessageMutex);
         ackMessageReceivers.insert(hostname);
     }
 
-    void HeartbeatSender::removeFromAckReceiverList(const std::string &hostname) {
+    void HeartbeatSender::removeFromAckMessageReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(ackMessageMutex);
         if (ackMessageReceivers.erase(hostname) == 0) {
             LOG(ERROR) << "Cannot find UDPSender for host: " << hostname << " in broadcast list";
@@ -91,10 +97,10 @@ namespace lab0 {
             std::string sender = pair.second;
 
             if (message.rfind(HeartbeatSender::aliveMessage, 0) == 0) {
-                HeartbeatSender::addToAckReceiverList(sender);
-                HeartbeatSender::removeFromAliveReceiverList(sender);
+                HeartbeatSender::addToAckMessageReceiverList(sender);
+                HeartbeatSender::removeFromAliveMessageReceiverList(sender);
             } else if (message.rfind(HeartbeatSender::ackMessage, 0) == 0) {
-                HeartbeatSender::removeFromAckReceiverList(sender);
+                HeartbeatSender::removeFromAckMessageReceiverList(sender);
             }
         }
     }

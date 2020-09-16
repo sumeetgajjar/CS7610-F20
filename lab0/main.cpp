@@ -19,10 +19,8 @@ int main(int argc, char **argv) {
     const auto peerContainerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
     const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
 
-    std::cout << currentContainerHostname << " -> Process Number -> " << currentProcessIdentifier << std::endl;
-
     for (const auto &peerContainerHostname : peerContainerHostnames) {
-        HeartbeatSender::addToAliveReceiverList(peerContainerHostname);
+        HeartbeatSender::addToAliveMessageReceiverList(peerContainerHostname);
     }
 
     std::thread alive([]() {
@@ -30,7 +28,7 @@ int main(int argc, char **argv) {
     });
 
     std::thread ack([]() {
-        HeartbeatSender::startSendingAckMessages();
+        HeartbeatSender::sendingAckMessages();
     });
 
     std::thread receive([]() {
