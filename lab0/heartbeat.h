@@ -29,7 +29,7 @@ namespace lab0 {
 
         static void startSendingAliveMessages();
 
-        static void addAliveReceiverList(const std::string &hostname);
+        static void addToAliveReceiverList(const std::string &hostname);
 
         static void removeFromAliveReceiverList(const std::string &hostname);
 

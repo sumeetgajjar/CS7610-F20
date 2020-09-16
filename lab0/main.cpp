@@ -2,7 +2,9 @@
 #include <glog/logging.h>
 #include <thread>
 
+#include "config.h"
 #include "utils.h"
+#include "heartbeat.h"
 #include "socket_utils.h"
 
 
@@ -19,19 +21,41 @@ int main(int argc, char **argv) {
 
     std::cout << currentContainerHostname << " -> Process Number -> " << currentProcessIdentifier << std::endl;
 
-    std::thread r([]() {
-        UDPReceiver receiver(1234);
-        auto pair = receiver.receiveMessage();
-        receiver.closeConnection();
+    for (const auto &peerContainerHostname : peerContainerHostnames) {
+        HeartbeatSender::addToAliveReceiverList(peerContainerHostname);
+    }
+
+    std::thread alive([]() {
+        HeartbeatSender::startSendingAliveMessages();
     });
-    sleep(2);
-    std::thread s([]() {
-        UDPSender sender("localhost", 1234);
-        sender.sendMessage("Hello from sender");
-        sender.closeConnection();
+
+    std::thread ack([]() {
+        HeartbeatSender::startSendingAckMessages();
     });
-    s.join();
-    r.join();
+
+    std::thread receive([]() {
+        UDPReceiver udpReceiver(UDP_PORT);
+        HeartbeatReceiver heartbeatReceiver(udpReceiver);
+        heartbeatReceiver.startListeningForMessages();
+    });
+
+    alive.join();
+    ack.join();
+    receive.join();
+
+//    std::thread r([]() {
+//        UDPReceiver receiver(1234);
+//        auto pair = receiver.receiveMessage();
+//        receiver.closeConnection();
+//    });
+//    sleep(2);
+//    std::thread s([]() {
+//        UDPSender sender("localhost", 1234);
+//        sender.sendMessage("Hello from sender");
+//        sender.closeConnection();
+//    });
+//    s.join();
+//    r.join();
 
     return 0;
 }

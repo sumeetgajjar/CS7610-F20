@@ -34,7 +34,7 @@ namespace lab0 {
         }
     }
 
-    void HeartbeatSender::addAliveReceiverList(const std::string &hostname) {
+    void HeartbeatSender::addToAliveReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
         udpSenders.insert(std::make_pair(hostname, std::make_unique<UDPSender>(UDPSender(hostname, UDP_PORT))));
         aliveMessageReceivers.insert(hostname);
