@@ -39,6 +39,9 @@ namespace lab0 {
             LOG(INFO) << "sleeping in startSendingAliveMessages";
             sleep(messageDelay);
         }
+        for (auto &udpSender : udpSenders) {
+            udpSender.second->closeConnection();
+        }
         LOG(INFO) << "stopped sending alive messages to peer";
     }
 
@@ -59,6 +62,11 @@ namespace lab0 {
         if (aliveMessageReceivers.empty()) {
             stopAliveMessageLoop = true;
         }
+    }
+
+    int HeartbeatSender::getAliveMessageReceiverListSIze() {
+        std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
+        return aliveMessageReceivers.size();
     }
 
     void HeartbeatSender::sendingAckMessages(const std::string &hostname) {
@@ -85,11 +93,6 @@ namespace lab0 {
         }
     }
 
-    int HeartbeatSender::getAliveMessageReceiverListSIze() {
-        std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
-        return aliveMessageReceivers.size();
-    }
-
     HeartbeatReceiver::HeartbeatReceiver(UDPReceiver &udpReceiver, std::unordered_set<std::string> validSenders) :
             udpReceiver(udpReceiver), validSenders(std::move(validSenders)) {}
 
@@ -107,7 +110,8 @@ namespace lab0 {
                 LOG(INFO) << "received alive message from hostname: " << sender;
                 HeartbeatSender::sendingAckMessages(sender);
                 validSenders.erase(sender);
-                LOG(INFO) << "removed sender: " << sender << ", from validSenders";
+                LOG(INFO) << "removed sender: " << sender << ", from validSenders, validSendersSize: "
+                          << validSenders.size();
             } else if (message.rfind(HeartbeatSender::ackMessage, 0) == 0) {
                 LOG(INFO) << "received ack from hostname: " << sender;
                 HeartbeatSender::removeFromAliveMessageReceiverList(sender);
@@ -115,6 +119,7 @@ namespace lab0 {
                 LOG(ERROR) << "unknown message from: " << sender << ", message: " << message;
             }
         }
+        udpReceiver.closeConnection();
         LOG(INFO) << "stopped listening for messages, as received alive message from all peers";
     }
 }

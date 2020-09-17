@@ -60,6 +60,7 @@ namespace lab0 {
     }
 
     void UDPSender::closeConnection() {
+        LOG(INFO) << "closing UDPSender for host: " << serverHost << ":" << serverPort;
         freeaddrinfo(serverInfoList);
         close(socketFD);
     }
@@ -128,6 +129,7 @@ namespace lab0 {
     }
 
     void UDPReceiver::closeConnection() {
+        LOG(INFO) << "closing UDPReceiver for host";
         close(sockfd);
     }
 
