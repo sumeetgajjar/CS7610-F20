@@ -12,5 +12,9 @@ fi
 
 for HOST in $(cat hostfile); do
   echo "starting container: ${HOST}"
-  docker run --rm -a stdout -a stderr --name "${HOST}" --network cs7610-bridge --hostname "${HOST}" prj0 -h /prj0/hostfile >"${HOST}".log 2>&1 &
+  docker run --rm -a stdout -a stderr \
+    --name "${HOST}" \
+    --network cs7610-bridge \
+    --hostname "${HOST}" \
+    sumeet-g-prj0 -h /prj0/hostfile >"${HOST}".log 2>&1 &
 done
