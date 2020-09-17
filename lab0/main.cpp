@@ -41,6 +41,7 @@ int main(int argc, char **argv) {
 
     std::mutex mutex;
     std::condition_variable conditionVariable;
+    bool heartbeatReceiverReady = false;
 
     std::thread receive([&]() {
         UDPReceiver udpReceiver(UDP_PORT);
@@ -48,6 +49,10 @@ int main(int argc, char **argv) {
         HeartbeatReceiver heartbeatReceiver(udpReceiver, validSenders);
 
         // Signaling HeartbeatSender to start sending alive messages
+        {
+            std::lock_guard<std::mutex> lockGuard(mutex);
+            heartbeatReceiverReady = true;
+        }
         conditionVariable.notify_one();
 
         heartbeatReceiver.startListeningForMessages();
@@ -56,7 +61,7 @@ int main(int argc, char **argv) {
     std::thread alive([&]() {
         // Waiting for HeartBeastReceiver to startListeningForMessages
         std::unique_lock<std::mutex> uniqueLock(mutex);
-        conditionVariable.wait(uniqueLock);
+        conditionVariable.wait(uniqueLock, [&] { return heartbeatReceiverReady; });
 
         HeartbeatSender::startSendingAliveMessages();
     });
