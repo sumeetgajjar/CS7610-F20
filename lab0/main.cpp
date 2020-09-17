@@ -10,9 +10,24 @@
 
 using namespace lab0;
 
+void testUDPSenderAndReceiver() {
+    std::thread r([]() {
+        UDPReceiver receiver(1234);
+        auto pair = receiver.receiveMessage();
+        receiver.closeConnection();
+    });
+    sleep(2);
+    std::thread s([]() {
+        UDPSender sender("localhost", 1234);
+        sender.sendMessage("Hello from sender");
+        sender.closeConnection();
+    });
+    s.join();
+    r.join();
+}
+
 int main(int argc, char **argv) {
     google::InitGoogleLogging(argv[0]);
-    LOG(INFO) << "Testing logging";
     const auto hostFilePath = Utils::parseHostFileFromCmdArguments(argc, argv);
     const auto hostnames = Utils::readHostFile(hostFilePath);
     const auto currentContainerHostname = Utils::getCurrentContainerHostname();
@@ -27,33 +42,15 @@ int main(int argc, char **argv) {
         HeartbeatSender::startSendingAliveMessages();
     });
 
-    std::thread ack([]() {
-        HeartbeatSender::sendingAckMessages();
-    });
-
-    std::thread receive([]() {
+    std::thread receive([&]() {
         UDPReceiver udpReceiver(UDP_PORT);
-        HeartbeatReceiver heartbeatReceiver(udpReceiver);
+        std::unordered_set<std::string> validSenders(peerContainerHostnames.begin(), peerContainerHostnames.end());
+        HeartbeatReceiver heartbeatReceiver(udpReceiver, validSenders);
         heartbeatReceiver.startListeningForMessages();
     });
 
     alive.join();
-    ack.join();
     receive.join();
-
-//    std::thread r([]() {
-//        UDPReceiver receiver(1234);
-//        auto pair = receiver.receiveMessage();
-//        receiver.closeConnection();
-//    });
-//    sleep(2);
-//    std::thread s([]() {
-//        UDPSender sender("localhost", 1234);
-//        sender.sendMessage("Hello from sender");
-//        sender.closeConnection();
-//    });
-//    s.join();
-//    r.join();
 
     return 0;
 }

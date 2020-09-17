@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <glog/logging.h>
 #include <climits>
+#include <utility>
 
 #include "socket_utils.h"
 
@@ -19,9 +20,12 @@ namespace lab0 {
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_DGRAM;
 
+        LOG(INFO) << "getting addrinfo for hostname: " << serverHost << ", port: " << serverPort;
         if (int rv = getaddrinfo(serverHost.c_str(), serverPort.c_str(), &hints, &serverInfoList);
                 rv != 0) {
-            LOG(FATAL) << "getaddrinfo failed: " << gai_strerror(rv);
+            throw std::runtime_error(
+                    "cannot find host: " + serverHost + ", port: " + serverPort + ", getaddrinfo failed: " +
+                    std::string(gai_strerror(rv)));
         }
 
         // loop through all the results and make a socket
@@ -31,7 +35,7 @@ namespace lab0 {
                 LOG(ERROR) << "error in creating sender socket";
                 continue;
             }
-            LOG(INFO) << "sender socket created";
+            LOG(INFO) << "sender socket created for hostname: " << serverHost << ", port:" << serverPort;
             break;
         }
 
@@ -56,10 +60,6 @@ namespace lab0 {
         close(socketFD);
     }
 
-    std::string UDPSender::getServerHost() {
-        return serverHost;
-    }
-
     void UDPReceiver::initSocket() {
         struct addrinfo hints, *serverInfoList, *serverAddrInfo;
         memset(&hints, 0, sizeof(hints));
@@ -82,11 +82,11 @@ namespace lab0 {
 
             if (bind(sockfd, serverAddrInfo->ai_addr, serverAddrInfo->ai_addrlen) == -1) {
                 close(sockfd);
-                LOG(FATAL) << "error in binding the socker to port: " << serverPort;
+                LOG(ERROR) << "error in binding the socket";
                 continue;
             }
 
-            LOG(INFO) << "receiver socker created";
+            LOG(INFO) << "receiver socket created";
             break;
         }
 
@@ -107,20 +107,13 @@ namespace lab0 {
         if (int numbytes = recvfrom(sockfd, buffer, MAX_BUFFER_SIZE - 1, 0, (struct sockaddr *) &their_addr,
                                     &addr_len);
                 numbytes == -1) {
-            std::string errorMessage = "error(" + std::to_string(numbytes) + ") occurred while receiving data";
+            std::string errorMessage("error(" + std::to_string(numbytes) + ") occurred while receiving data");
             LOG(ERROR) << errorMessage;
             throw std::runtime_error(errorMessage);
         } else {
             buffer[numbytes] = '\0';
             std::string message(buffer);
-
-            char host[HOST_NAME_MAX + 1];
-            if (int rv = getnameinfo((struct sockaddr *) &their_addr, addr_len, host, sizeof(host), NULL, 0, 0);
-                    rv != 0) {
-                LOG(ERROR) << "could not get the name of the sender, error code: " << rv << ", error message: "
-                           << gai_strerror(rv);
-            }
-            std::string receivedFrom(host);
+            std::string receivedFrom = SocketUtils::getHostnameFromSocket((struct sockaddr *) &their_addr);
             LOG(INFO) << "received:" << numbytes << " bytes, from: " << receivedFrom << ", message: " << message;
             return std::pair<std::string, std::string>(message, receivedFrom);
         }
@@ -128,5 +121,16 @@ namespace lab0 {
 
     void UDPReceiver::closeConnection() {
         close(sockfd);
+    }
+
+    std::string SocketUtils::getHostnameFromSocket(sockaddr *sockaddr) {
+        char host[HOST_NAME_MAX + 1];
+        if (int rv = getnameinfo(sockaddr, sizeof(*sockaddr), host, sizeof(host), NULL, 0, 0);
+                rv != 0) {
+            LOG(FATAL) << "could not get the name of the sender, error code: " << rv << ", error message: "
+                       << gai_strerror(rv);
+        }
+        std::string hostname(host);
+        return hostname.substr(0, hostname.find('.'));
     }
 }

@@ -11,9 +11,14 @@
 
 namespace lab0 {
 
+    class SocketUtils {
+    public:
+        static std::string getHostnameFromSocket(sockaddr *sockaddr);
+    };
+
     class UDPSender {
     private:
-        const std::string serverHost, serverPort;
+        std::string serverHost, serverPort;
         int socketFD;
         struct addrinfo *serverInfoList, *serverAddrInfo;
 
@@ -23,8 +28,6 @@ namespace lab0 {
         UDPSender(std::string host, int port) : serverHost(std::move(host)), serverPort(std::to_string(port)) {
             initSocket();
         };
-
-        std::string getServerHost();
 
         void sendMessage(const std::string &message);
 

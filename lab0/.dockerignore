@@ -3,6 +3,6 @@
 !*.h
 !*.cpp
 !*.h.in
+!*.sh
 !hostfile
 !CMakeLists.txt
-!install_dependencies.sh

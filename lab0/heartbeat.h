@@ -17,13 +17,16 @@ namespace lab0 {
     class HeartbeatSender {
     private:
         static std::mutex aliveMessageMutex;
-        static std::unordered_set<std::string> aliveMessageReceivers;
-        static std::mutex ackMessageMutex;
-        static std::unordered_set<std::string> ackMessageReceivers;
-        static std::unordered_map<std::string, std::unique_ptr<UDPSender>> udpSenders;
-        static std::atomic_bool stopAliveMessageLoop, stopAckMessageLoop;
+        static std::mutex udpSendersMutex;
+        static std::unordered_map<std::string, std::shared_ptr<UDPSender>> udpSenders;
+        static std::atomic_bool stopAliveMessageLoop;
         static const int messageDelay = 2;
+
     public:
+        static std::unordered_set<std::string> aliveMessageReceivers;
+
+        static std::shared_ptr<UDPSender> getUDPSender(const std::string &hostname);
+
         static const std::string aliveMessage;
         static const std::string ackMessage;
 
@@ -33,18 +36,16 @@ namespace lab0 {
 
         static void removeFromAliveMessageReceiverList(const std::string &hostname);
 
-        static void sendingAckMessages();
+        static void sendingAckMessages(const std::string &hostname);
 
-        static void addToAckMessageReceiverList(const std::string &hostname);
-
-        static void removeFromAckMessageReceiverList(const std::string &hostname);
     };
 
     class HeartbeatReceiver {
     private:
         UDPReceiver udpReceiver;
+        std::unordered_set<std::string> validSenders;
     public:
-        HeartbeatReceiver(UDPReceiver &udpReceiver);
+        HeartbeatReceiver(UDPReceiver &udpReceiver, std::unordered_set<std::string> validSenders);
 
         void startListeningForMessages();
     };

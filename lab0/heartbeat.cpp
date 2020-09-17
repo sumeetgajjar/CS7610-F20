@@ -9,6 +9,7 @@
 #include "socket_utils.h"
 #include "heartbeat.h"
 #include "config.h"
+#include "utils.h"
 
 namespace lab0 {
 
@@ -16,10 +17,9 @@ namespace lab0 {
     const std::string HeartbeatSender::ackMessage = "Ack"; // NOLINT(cert-err58-cpp)
     std::mutex HeartbeatSender::aliveMessageMutex;
     std::unordered_set<std::string> HeartbeatSender::aliveMessageReceivers;
-    std::mutex HeartbeatSender::ackMessageMutex;
-    std::unordered_set<std::string> HeartbeatSender::ackMessageReceivers;
-    std::unordered_map<std::string, std::unique_ptr<UDPSender>> HeartbeatSender::udpSenders;
-    std::atomic_bool HeartbeatSender::stopAliveMessageLoop = false, HeartbeatSender::stopAckMessageLoop = false;
+    std::mutex HeartbeatSender::udpSendersMutex;
+    std::unordered_map<std::string, std::shared_ptr<UDPSender>> HeartbeatSender::udpSenders;
+    std::atomic_bool HeartbeatSender::stopAliveMessageLoop = false;
 
     void HeartbeatSender::startSendingAliveMessages() {
         LOG(INFO) << "starting startSendingAliveMessages";
@@ -28,8 +28,12 @@ namespace lab0 {
                 std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
                 LOG(INFO) << "sending alive messages to " << aliveMessageReceivers.size() << " receivers";
                 for (auto &hostname : aliveMessageReceivers) {
-                    //TODO: resolve this
-                    udpSenders[hostname].get()->sendMessage(aliveMessage);
+                    auto udpSender = getUDPSender(hostname);
+                    if (udpSender != nullptr) {
+                        udpSender->sendMessage(aliveMessage);
+                    } else {
+                        LOG(WARNING) << "UDPSender not found for host: " << hostname;
+                    }
                 }
             }
             LOG(INFO) << "sleeping in startSendingAliveMessages";
@@ -41,7 +45,6 @@ namespace lab0 {
     void HeartbeatSender::addToAliveMessageReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
         LOG(INFO) << "adding " << hostname << " to aliveMessageReceivers";
-        udpSenders.insert(std::make_pair(hostname, std::make_unique<UDPSender>(UDPSender(hostname, UDP_PORT))));
         aliveMessageReceivers.insert(hostname);
     }
 
@@ -50,58 +53,62 @@ namespace lab0 {
         if (aliveMessageReceivers.erase(hostname) == 0) {
             LOG(ERROR) << "Cannot find UDPSender for host: " << hostname << " in broadcast list";
         } else {
-            LOG(ERROR) << "Removed host: " << hostname << " from broadcast list";
+            LOG(ERROR) << "Removed host: " << hostname << " from broadcast list, queue size: "
+                       << aliveMessageReceivers.size();
         }
         if (aliveMessageReceivers.empty()) {
             stopAliveMessageLoop = true;
         }
     }
 
-    void HeartbeatSender::sendingAckMessages() {
-        // TODO: only send once
-        while (!stopAckMessageLoop) {
-            {
-                std::lock_guard<std::mutex> lockGuard(ackMessageMutex);
-                for (auto &hostname : ackMessageReceivers) {
-                    udpSenders[hostname].get()->sendMessage(ackMessage);
-                }
+    void HeartbeatSender::sendingAckMessages(const std::string &hostname) {
+        LOG(INFO) << "sending ack message to host: " << hostname;
+        getUDPSender(hostname)->sendMessage(ackMessage);
+        LOG(INFO) << "ack message sent to host: " << hostname;
+    }
+
+    std::shared_ptr<UDPSender> HeartbeatSender::getUDPSender(const std::string &hostname) {
+        std::lock_guard<std::mutex> lockGuard(udpSendersMutex);
+        if (udpSenders.find(hostname) == udpSenders.end()) {
+            try {
+                udpSenders.insert(std::make_pair(hostname, std::make_shared<UDPSender>(UDPSender(hostname, UDP_PORT))));
+                LOG(WARNING) << "udpSenders size: " << udpSenders.size();
+            } catch (const std::runtime_error &e) {
+                LOG(ERROR) << "UDPSender creation error: " << e.what();
             }
-            sleep(messageDelay);
         }
-    }
 
-    void HeartbeatSender::addToAckMessageReceiverList(const std::string &hostname) {
-        std::lock_guard<std::mutex> lockGuard(ackMessageMutex);
-        ackMessageReceivers.insert(hostname);
-    }
-
-    void HeartbeatSender::removeFromAckMessageReceiverList(const std::string &hostname) {
-        std::lock_guard<std::mutex> lockGuard(ackMessageMutex);
-        if (ackMessageReceivers.erase(hostname) == 0) {
-            LOG(ERROR) << "Cannot find UDPSender for host: " << hostname << " in broadcast list";
+        if (udpSenders.find(hostname) != udpSenders.end()) {
+            return udpSenders[hostname];
         } else {
-            LOG(ERROR) << "Removed host: " << hostname << " from broadcast list";
-        }
-        if (ackMessageReceivers.empty()) {
-            stopAckMessageLoop = true;
+            return nullptr;
         }
     }
 
-    HeartbeatReceiver::HeartbeatReceiver(UDPReceiver &udpReceiver) : udpReceiver(udpReceiver) {}
+    HeartbeatReceiver::HeartbeatReceiver(UDPReceiver &udpReceiver, std::unordered_set<std::string> validSenders) :
+            udpReceiver(udpReceiver), validSenders(std::move(validSenders)) {}
 
     void HeartbeatReceiver::startListeningForMessages() {
-        while (true) {
-            // TODO: think about this
+        LOG(INFO) << "started startListeningForMessages";
+        while (!validSenders.empty() || !HeartbeatSender::aliveMessageReceivers.empty()) {
             auto pair = udpReceiver.receiveMessage();
-            std::string message = pair.first;
-            std::string sender = pair.second;
+            auto message = pair.first;
+            auto sender = pair.second;
 
             if (message.rfind(HeartbeatSender::aliveMessage, 0) == 0) {
-                HeartbeatSender::addToAckMessageReceiverList(sender);
-                HeartbeatSender::removeFromAliveMessageReceiverList(sender);
+                LOG(INFO) << "received alive message from hostname: " << sender;
+                HeartbeatSender::sendingAckMessages(sender);
+                validSenders.erase(sender);
+                LOG(INFO) << "removed sender: " << sender << ", from validSenders";
             } else if (message.rfind(HeartbeatSender::ackMessage, 0) == 0) {
-                HeartbeatSender::removeFromAckMessageReceiverList(sender);
+                LOG(INFO) << "received ack from hostname: " << sender;
+                HeartbeatSender::removeFromAliveMessageReceiverList(sender);
+            } else {
+                LOG(ERROR) << "unknown message from: " << sender << ", message: " << message;
             }
         }
+        LOG(INFO) << "stop startListeningForMessages";
+        LOG(INFO) << "Received alive message from all peers";
+        LOG(INFO) << "READY";
     }
 }

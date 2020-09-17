@@ -39,6 +39,9 @@ namespace lab0 {
         }
         hostFile.close();
         LOG(INFO) << hostnames.size() << " hosts found";
+        if (hostnames.size() < 2) {
+            LOG(FATAL) << "hostfile should contain more than 1 hosts";
+        }
         return hostnames;
     }
 
@@ -65,7 +68,7 @@ namespace lab0 {
                 return i + 1;
             }
         }
-        LOG(FATAL) << "cannot find process identifier for : " + hostname;
+        LOG(FATAL) << "cannot find process identifier for: " + hostname;
     }
 
     std::string Utils::parseHostFileFromCmdArguments(int argc, char **argv) {
