@@ -13,6 +13,10 @@
 
 namespace lab0 {
 
+    UDPSender::UDPSender(std::string host, int port) : serverHost(std::move(host)), serverPort(std::to_string(port)) {
+        LOG(INFO) << "creating UDPSender for hostname: " << serverHost << ", port: " << serverPort;
+        initSocket();
+    };
 
     void UDPSender::initSocket() {
         struct addrinfo hints;
@@ -20,12 +24,10 @@ namespace lab0 {
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_DGRAM;
 
-        LOG(INFO) << "getting addrinfo for hostname: " << serverHost << ", port: " << serverPort;
         if (int rv = getaddrinfo(serverHost.c_str(), serverPort.c_str(), &hints, &serverInfoList);
                 rv != 0) {
-            throw std::runtime_error(
-                    "cannot find host: " + serverHost + ", port: " + serverPort + ", getaddrinfo failed: " +
-                    std::string(gai_strerror(rv)));
+            throw std::runtime_error("cannot find host: " + serverHost + ", port: " + serverPort +
+                                     ", getaddrinfo failed: " + std::string(gai_strerror(rv)));
         }
 
         // loop through all the results and make a socket
@@ -45,13 +47,15 @@ namespace lab0 {
     }
 
     void UDPSender::sendMessage(const std::string &message) {
-        LOG(INFO) << "sending message: " << message;
+        LOG(INFO) << "sending to host: " << serverHost << ":" << serverPort << " ,message: " << message;
         if (int numbytes = sendto(socketFD, message.c_str(), message.size(), 0, serverAddrInfo->ai_addr,
                                   serverAddrInfo->ai_addrlen);
                 numbytes == -1) {
-            LOG(ERROR) << "error(" << numbytes << ") occurred while sending message: " << message;
+            LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
+                       << ", message: " << message;
         } else {
-            LOG(INFO) << "sent to " << serverHost << ", bytes: " << numbytes << ", message: " << message;
+            LOG(INFO) << "sent to " << serverHost << ":" << serverPort << ", bytes: " << numbytes
+                      << ", message: " << message;
         }
     }
 
@@ -97,6 +101,10 @@ namespace lab0 {
         freeaddrinfo(serverInfoList);
     }
 
+    UDPReceiver::UDPReceiver(int port) : serverPort(std::to_string(port)) {
+        initSocket();
+    }
+
     std::pair<std::string, std::string> UDPReceiver::receiveMessage() {
         struct sockaddr_storage their_addr;
         socklen_t addr_len;
@@ -130,7 +138,6 @@ namespace lab0 {
             LOG(FATAL) << "could not get the name of the sender, error code: " << rv << ", error message: "
                        << gai_strerror(rv);
         }
-        std::string hostname(host);
-        return hostname.substr(0, hostname.find('.'));
+        return std::string(host);
     }
 }

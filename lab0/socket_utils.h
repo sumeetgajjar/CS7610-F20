@@ -25,9 +25,7 @@ namespace lab0 {
         void initSocket();
 
     public:
-        UDPSender(std::string host, int port) : serverHost(std::move(host)), serverPort(std::to_string(port)) {
-            initSocket();
-        };
+        UDPSender(std::string host, int port);
 
         void sendMessage(const std::string &message);
 
@@ -44,12 +42,11 @@ namespace lab0 {
         void initSocket();
 
     public:
-        UDPReceiver(int port) : serverPort(std::to_string(port)) {
-            initSocket();
-        }
+        UDPReceiver(int port);
 
         /**
          * Blocks till a message is received
+         *
          * @return Returns a pair of (received message, hostname of the sender)
          */
         std::pair<std::string, std::string> receiveMessage();

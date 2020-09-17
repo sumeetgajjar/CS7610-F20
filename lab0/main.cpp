@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
 
     alive.join();
     receive.join();
+    LOG(INFO) << "READY";
 
     return 0;
 }

@@ -17,13 +17,13 @@ namespace lab0 {
     class HeartbeatSender {
     private:
         static std::mutex aliveMessageMutex;
+        static std::unordered_set<std::string> aliveMessageReceivers;
         static std::mutex udpSendersMutex;
         static std::unordered_map<std::string, std::shared_ptr<UDPSender>> udpSenders;
         static std::atomic_bool stopAliveMessageLoop;
-        static const int messageDelay = 2;
 
+        static const int messageDelay = 4;
     public:
-        static std::unordered_set<std::string> aliveMessageReceivers;
 
         static std::shared_ptr<UDPSender> getUDPSender(const std::string &hostname);
 
@@ -35,6 +35,8 @@ namespace lab0 {
         static void addToAliveMessageReceiverList(const std::string &hostname);
 
         static void removeFromAliveMessageReceiverList(const std::string &hostname);
+
+        static int getAliveMessageReceiverListSIze();
 
         static void sendingAckMessages(const std::string &hostname);
 

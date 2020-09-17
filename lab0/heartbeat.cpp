@@ -22,7 +22,7 @@ namespace lab0 {
     std::atomic_bool HeartbeatSender::stopAliveMessageLoop = false;
 
     void HeartbeatSender::startSendingAliveMessages() {
-        LOG(INFO) << "starting startSendingAliveMessages";
+        LOG(INFO) << "starting sending alive messages to peer";
         while (!stopAliveMessageLoop) {
             {
                 std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
@@ -39,7 +39,7 @@ namespace lab0 {
             LOG(INFO) << "sleeping in startSendingAliveMessages";
             sleep(messageDelay);
         }
-        LOG(INFO) << "stopping startSendingAliveMessages";
+        LOG(INFO) << "stopped sending alive messages to peer";
     }
 
     void HeartbeatSender::addToAliveMessageReceiverList(const std::string &hostname) {
@@ -51,9 +51,9 @@ namespace lab0 {
     void HeartbeatSender::removeFromAliveMessageReceiverList(const std::string &hostname) {
         std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
         if (aliveMessageReceivers.erase(hostname) == 0) {
-            LOG(ERROR) << "Cannot find UDPSender for host: " << hostname << " in broadcast list";
+            LOG(ERROR) << "cannot find UDPSender for host: " << hostname << " in broadcast list";
         } else {
-            LOG(ERROR) << "Removed host: " << hostname << " from broadcast list, queue size: "
+            LOG(ERROR) << "removed host: " << hostname << " from broadcast list, queue size: "
                        << aliveMessageReceivers.size();
         }
         if (aliveMessageReceivers.empty()) {
@@ -72,7 +72,7 @@ namespace lab0 {
         if (udpSenders.find(hostname) == udpSenders.end()) {
             try {
                 udpSenders.insert(std::make_pair(hostname, std::make_shared<UDPSender>(UDPSender(hostname, UDP_PORT))));
-                LOG(WARNING) << "udpSenders size: " << udpSenders.size();
+                LOG(INFO) << "udpSenders size: " << udpSenders.size();
             } catch (const std::runtime_error &e) {
                 LOG(ERROR) << "UDPSender creation error: " << e.what();
             }
@@ -85,15 +85,23 @@ namespace lab0 {
         }
     }
 
+    int HeartbeatSender::getAliveMessageReceiverListSIze() {
+        std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
+        return aliveMessageReceivers.size();
+    }
+
     HeartbeatReceiver::HeartbeatReceiver(UDPReceiver &udpReceiver, std::unordered_set<std::string> validSenders) :
             udpReceiver(udpReceiver), validSenders(std::move(validSenders)) {}
 
     void HeartbeatReceiver::startListeningForMessages() {
-        LOG(INFO) << "started startListeningForMessages";
-        while (!validSenders.empty() || !HeartbeatSender::aliveMessageReceivers.empty()) {
+        LOG(INFO) << "started listening for messages";
+        while (!validSenders.empty() || HeartbeatSender::getAliveMessageReceiverListSIze() != 0) {
             auto pair = udpReceiver.receiveMessage();
             auto message = pair.first;
             auto sender = pair.second;
+            // sender is of form <hostname>.<network-name>. e.g: "sumeet-g-alpha.cs7610-bridge"
+            // However the hostfile just contains "sumeet-g-alpha", hence need to split the sender string
+            sender = sender.substr(0, sender.find('.'));
 
             if (message.rfind(HeartbeatSender::aliveMessage, 0) == 0) {
                 LOG(INFO) << "received alive message from hostname: " << sender;
@@ -107,8 +115,6 @@ namespace lab0 {
                 LOG(ERROR) << "unknown message from: " << sender << ", message: " << message;
             }
         }
-        LOG(INFO) << "stop startListeningForMessages";
-        LOG(INFO) << "Received alive message from all peers";
-        LOG(INFO) << "READY";
+        LOG(INFO) << "stopped listening for messages, as received alive message from all peers";
     }
 }

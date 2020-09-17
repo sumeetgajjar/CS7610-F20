@@ -18,7 +18,7 @@ namespace lab0 {
         char hostname[HOST_NAME_MAX];
         int errorCode = gethostname(hostname, HOST_NAME_MAX);
         if (errorCode) {
-            LOG(FATAL) << "Cannot find the current host name";
+            LOG(FATAL) << "cannot find the current host name";
         }
         LOG(INFO) << "current host name: " << hostname;
         return std::string(hostname);
@@ -74,12 +74,12 @@ namespace lab0 {
     std::string Utils::parseHostFileFromCmdArguments(int argc, char **argv) {
         LOG(INFO) << "parsing cmd arguments";
         if (argc != 3) {
-            LOG(FATAL) << "Invalid usage, correct usage is: ./lab0 -h <hostfile>";
+            LOG(FATAL) << "invalid usage, correct usage is: ./lab0 -h <hostfile>";
         }
 
         bool hostFilePresent = std::string(argv[1]) == "-h";
         if (!hostFilePresent) {
-            LOG(FATAL) << "Invalid usage, correct usage is: ./lab0 -h <hostfile>";
+            LOG(FATAL) << "invalid usage, correct usage is: ./lab0 -h <hostfile>";
         }
 
         LOG(INFO) << "cmd arguments parsed";
