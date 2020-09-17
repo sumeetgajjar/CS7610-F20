@@ -1,6 +1,7 @@
 #include <iostream>
 #include <glog/logging.h>
 #include <thread>
+#include <condition_variable>
 
 #include "config.h"
 #include "utils.h"
@@ -38,19 +39,30 @@ int main(int argc, char **argv) {
         HeartbeatSender::addToAliveMessageReceiverList(peerContainerHostname);
     }
 
-    std::thread alive([]() {
-        HeartbeatSender::startSendingAliveMessages();
-    });
+    std::mutex mutex;
+    std::condition_variable conditionVariable;
 
     std::thread receive([&]() {
         UDPReceiver udpReceiver(UDP_PORT);
         std::unordered_set<std::string> validSenders(peerContainerHostnames.begin(), peerContainerHostnames.end());
         HeartbeatReceiver heartbeatReceiver(udpReceiver, validSenders);
+
+        // Signaling HeartbeatSender to start sending alive messages
+        conditionVariable.notify_one();
+
         heartbeatReceiver.startListeningForMessages();
     });
 
-    alive.join();
+    std::thread alive([&]() {
+        // Waiting for HeartBeastReceiver to startListeningForMessages
+        std::unique_lock<std::mutex> uniqueLock(mutex);
+        conditionVariable.wait(uniqueLock);
+
+        HeartbeatSender::startSendingAliveMessages();
+    });
+
     receive.join();
+    alive.join();
     LOG(INFO) << "READY";
 
     return 0;
