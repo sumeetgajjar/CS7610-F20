@@ -1,4 +1,4 @@
-#### HeartbeatReceiver
+### HeartbeatReceiver
 This class is responsible for listening for messages. There are two kind of messages:
 1. "I am alive": This is sent by all hosts to all the peers.
 2. "Ack": This message is a acknowledgement for the "I am alive" message.
@@ -8,7 +8,7 @@ This class is responsible for sending messages to its peer. It can send the abov
 
 **Note:** `HeartbeatSender` and `HeartbeatReceiver` are running in separate threads.
 
-### Algorithm
+## Algorithm
 
 1. `HeartbeatReceiver` has a `validSenders` set which initially contains hostnames of all peers.
 2. `HeartbeatReceiver` starts listening for messages in a loop in a new thread.
