@@ -19,10 +19,6 @@ int main(int argc, char **argv) {
     const auto peerContainerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
     const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
 
-    for (const auto &peerContainerHostname : peerContainerHostnames) {
-        HeartbeatSender::addToAliveMessageReceiverList(peerContainerHostname);
-    }
-
     std::mutex mutex;
     std::condition_variable conditionVariable;
     bool heartbeatReceiverReady = false;
@@ -43,6 +39,10 @@ int main(int argc, char **argv) {
     });
 
     std::thread alive([&]() {
+        for (const auto &peerContainerHostname : peerContainerHostnames) {
+            HeartbeatSender::addToAliveMessageReceiverList(peerContainerHostname);
+        }
+
         // Waiting for HeartBeastReceiver to startListeningForMessages
         std::unique_lock<std::mutex> uniqueLock(mutex);
         conditionVariable.wait(uniqueLock, [&] { return heartbeatReceiverReady; });
