@@ -1,0 +1,8 @@
+*
+
+!*.h
+!*.cpp
+!*.h.in
+!*.sh
+!hostfile
+!CMakeLists.txt

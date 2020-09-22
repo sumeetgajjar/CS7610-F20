@@ -1,0 +1,8 @@
+#ifndef LAB0_CONFIG_H
+#define LAB0_CONFIG_H
+
+namespace lab0 {
+#define UDP_PORT @UDP_PORT@
+}
+
+#endif
