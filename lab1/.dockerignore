@@ -1,0 +1,6 @@
+*
+
+!*.cpp
+!*.sh
+!CMakeLists.txt
+!conanfile.txt
