@@ -1,12 +1,20 @@
-#include <iostream>
+#include "flags.h"
+#include "utils.h"
+
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
-DEFINE_int32(test, 1, "dummy");
+
+using namespace lab1;
 
 int main(int argc, char **argv) {
     google::InitGoogleLogging(argv[0]);
-    gflags::ParseCommandLineFlags(&argc, &argv, false);
-    LOG(INFO) << "Flag -> " << FLAGS_test;
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+    const auto hostnames = Utils::readHostFile(FLAGS_hostfilePath);
+    const auto currentContainerHostname = Utils::getCurrentContainerHostname();
+    const auto peerContainerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
+    const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
+
     return 0;
 }
