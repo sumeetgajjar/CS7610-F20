@@ -2,7 +2,7 @@
 build
 cmake-build-debug
 *.log
-dependenciesCMake
+cmake_modules
 
 # Created by .ignore support plugin (hsz.mobi)
 ### CMake template

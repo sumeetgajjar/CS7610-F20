@@ -7,10 +7,10 @@ set(CMAKE_CXX_COMPILER g++-7)
 
 configure_file(hostfile hostfile COPYONLY)
 
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/dependenciesCMake ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH})
 find_package(gflags 2.2.2 REQUIRED)
 find_package(glog 0.4.0 REQUIRED)
 
-add_executable(lab1 main.cpp message.h utils.h socket_utils.h utils.cpp utils.h flags.h config.h)
+add_executable(lab1 src/main.cpp src/message.h src/utils.h src/socket_utils.h src/utils.cpp src/utils.h src/flags.h src/config.h)
 
 target_link_libraries(lab1 glog::glog gflags::gflags)

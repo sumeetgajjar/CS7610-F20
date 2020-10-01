@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
 set -e
-DEPENDENCIES="dependenciesCMake"
-if [ -d ${DEPENDENCIES} ]; then
-  echo "Removing dependencies dir: '${DEPENDENCIES}'"
-  rm -rf ${DEPENDENCIES}
+CMAKE_MODULES_DIR="cmake_modules"
+if [ -d ${CMAKE_MODULES_DIR} ]; then
+  echo "Removing cmake modules dir: '${CMAKE_MODULES_DIR}'"
+  rm -rf ${CMAKE_MODULES_DIR}
 fi
 
-echo "Creating dependencies dir: '${DEPENDENCIES}'"
-mkdir ${DEPENDENCIES}
+echo "Creating cmake modules dir: '${CMAKE_MODULES_DIR}'"
+mkdir ${CMAKE_MODULES_DIR}
 
 conan install . \
   --generator cmake_find_package \
-  --install-folder=${DEPENDENCIES} \
+  --install-folder=${CMAKE_MODULES_DIR} \
   -r conan-center \
   -s os=Linux \
   -s os_build=Linux \
