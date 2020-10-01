@@ -24,7 +24,8 @@ RUN mkdir -p lab1/build
 COPY install-dependencies.sh conanfile.txt lab1/
 RUN cd lab1 && ./install-dependencies.sh
 
-COPY *.cpp CMakeLists.txt lab1/
+COPY hostfile CMakeLists.txt lab1/
+COPY src lab1/src
 WORKDIR lab1/build
 RUN cmake .. && make
 
