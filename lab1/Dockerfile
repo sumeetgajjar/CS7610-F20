@@ -29,4 +29,4 @@ WORKDIR lab1/build
 RUN cmake .. && make
 
 ENV GLOG_logtostderr=1
-ENTRYPOINT ["/lab1/build/bin/lab1"]
+ENTRYPOINT ["/lab1/build/lab1"]

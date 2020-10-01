@@ -3,8 +3,10 @@ project(lab1)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include(dependenciesCMake/conanbuildinfo.cmake)
-conan_basic_setup(TARGETS)
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/dependenciesCMake ${CMAKE_MODULE_PATH})
+find_package(gflags 2.2.2 REQUIRED)
+find_package(glog 0.4.0 REQUIRED)
 
 add_executable(lab1 main.cpp)
-target_link_libraries(lab1 CONAN_PKG::glog CONAN_PKG::gflags)
+
+target_link_libraries(lab1 glog::glog gflags::gflags)
