@@ -1,10 +1,10 @@
-#include "socket_utils.h"
+#include "network_utils.h"
 
 #include <glog/logging.h>
 #include <climits>
 
 namespace lab1 {
-    std::string SocketUtils::getCurrentContainerHostname() {
+    std::string NetworkUtils::getCurrentContainerHostname() {
         VLOG(1) << "getting current host";
         char hostname[HOST_NAME_MAX];
         int status = gethostname(hostname, HOST_NAME_MAX);

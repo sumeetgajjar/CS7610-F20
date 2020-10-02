@@ -2,16 +2,16 @@
 // Created by sumeet on 9/30/20.
 //
 
-#ifndef LAB1_SOCKET_UTILS_H
-#define LAB1_SOCKET_UTILS_H
+#ifndef LAB1_NETWORK_UTILS_H
+#define LAB1_NETWORK_UTILS_H
 
 #include <string>
 
 namespace lab1 {
-    class SocketUtils {
+    class NetworkUtils {
     public:
         static std::string getCurrentContainerHostname();
     };
 }
 
-#endif //LAB1_SOCKET_UTILS_H
+#endif //LAB1_NETWORK_UTILS_H
