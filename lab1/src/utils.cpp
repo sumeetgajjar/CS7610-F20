@@ -5,23 +5,13 @@
 #include "utils.h"
 
 #include <iostream>
-#include <climits>
 #include <vector>
 #include <set>
 #include <fstream>
 #include <glog/logging.h>
-#include <unistd.h>
 
 namespace lab1 {
 
-    std::string Utils::getCurrentContainerHostname() {
-        VLOG(1) << "getting current host";
-        char hostname[HOST_NAME_MAX];
-        int status = gethostname(hostname, HOST_NAME_MAX);
-        CHECK(status == 0) << "cannot find the current host name, errorCode: " << errno;
-        LOG(INFO) << "current host name: " << hostname;
-        return std::string(hostname);
-    }
 
     std::vector<std::string> Utils::readHostFile(const std::string &hostFilePath) {
         VLOG(1) << "reading host file, path: " << hostFilePath;

@@ -12,7 +12,6 @@
 namespace lab1 {
     class Utils {
     public:
-        static std::string getCurrentContainerHostname();
 
         static std::vector<std::string> readHostFile(const std::string &hostFilePath);
 

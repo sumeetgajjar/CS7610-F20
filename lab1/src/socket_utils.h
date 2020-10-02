@@ -5,8 +5,13 @@
 #ifndef LAB1_SOCKET_UTILS_H
 #define LAB1_SOCKET_UTILS_H
 
-namespace lab1 {
+#include <string>
 
+namespace lab1 {
+    class SocketUtils {
+    public:
+        static std::string getCurrentContainerHostname();
+    };
 }
 
 #endif //LAB1_SOCKET_UTILS_H
