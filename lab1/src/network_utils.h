@@ -12,7 +12,9 @@
 #include <unordered_map>
 #include <atomic>
 #include <memory>
-#include "constants.h"
+
+#define MAX_UDP_BUFFER_SIZE 1024
+#define HEARTBEAT_PORT 7610
 
 namespace lab1 {
     class NetworkUtils {
@@ -22,28 +24,33 @@ namespace lab1 {
         static std::string getHostnameFromSocket(sockaddr *sockaddr);
     };
 
-    class UDPTransport {
-        // common info
-        const std::string hostname;
-        const int port;
-        const int recvPort;
+    class UDPSender {
+    private:
+        std::string serverHost;
+        int serverPort;
+        int sendFD;
+        struct addrinfo *serverInfoList, *serverAddrInfo;
 
-        // for sending
-        int sendFD = -1;
-        struct addrinfo *serverInfoList = nullptr, *serverAddrInfo = nullptr;
-
-        // for receiving
-        int recvFD = -1;
-        char recvBuffer[MAX_UDP_BUFFER_SIZE];
-
-        void initReceiver();
-
-        void initSender();
+        void initSocket();
 
     public:
-        UDPTransport(std::string hostname, int port);
+        UDPSender(std::string serverHost, int serverPort);
 
         void send(const std::string &message);
+
+        void close();
+    };
+
+    class UDPReceiver {
+    private:
+        int recvFD;
+        std::string portToListen;
+        char buffer[MAX_UDP_BUFFER_SIZE];
+
+        void initSocket();
+
+    public:
+        explicit UDPReceiver(int portToListen);
 
         /**
          * Blocks till a message is received
@@ -53,44 +60,6 @@ namespace lab1 {
         std::pair<std::string, std::string> receive();
 
         void close();
-    };
-
-    class HeartbeatSender {
-    private:
-        std::mutex aliveMessageMutex;
-        std::unordered_set<std::string> aliveMessageReceivers;
-        std::mutex transportMutex;
-        std::unordered_map<std::string, std::shared_ptr<UDPTransport>> udpTransport;
-        std::atomic_bool stopAliveMessageLoop;
-        const int messageDelay = 4;
-
-        std::shared_ptr<UDPTransport> getUDPTransport(const std::string &hostname);
-
-    public:
-
-        static const std::string aliveMessage;
-        static const std::string ackMessage;
-
-        void startSendingAliveMessages();
-
-        void addToAliveMessageReceiverList(const std::string &hostname);
-
-        void removeFromAliveMessageReceiverList(const std::string &hostname);
-
-        int getAliveMessageReceiverListSIze();
-
-        void sendingAckMessages(const std::string &hostname);
-
-    };
-
-    class HeartbeatReceiver {
-    private:
-        UDPTransport udpTransport;
-        std::unordered_set<std::string> validSenders;
-    public:
-        HeartbeatReceiver(UDPTransport &udpReceiver, std::unordered_set<std::string> validSenders);
-
-        void startListeningForMessages();
     };
 }
 

@@ -17,10 +17,12 @@ int main(int argc, char **argv) {
     const auto peerContainerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
     const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
 
-    UDPTransport udpTransport = UDPTransport("beta", 1234);
-    udpTransport.send("asd");
-    auto pair = udpTransport.receive();
+    UDPReceiver udpReceiver = UDPReceiver(1234);
+    UDPSender udpSender = UDPSender("localhost", 1234);
+    udpSender.send("asd");
+    auto pair = udpReceiver.receive();
     LOG(INFO) << pair.first << " <- " << pair.second;
-
+    udpSender.close();
+    udpReceiver.close();
     return 0;
 }
