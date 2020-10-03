@@ -8,8 +8,8 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-DEFINE_string(hostfilePath, "", "path to the hostfile");
-DEFINE_validator(hostfilePath, [](const char *flagname, const std::string &value) {
+DEFINE_string(hostfile, "", "path to the hostfile");
+DEFINE_validator(hostfile, [](const char *flagname, const std::string &value) {
     return !value.empty();
 });
 

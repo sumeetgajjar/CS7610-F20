@@ -28,7 +28,7 @@ namespace lab1 {
         }
         hostFile.close();
         LOG(INFO) << hostnames.size() << " hosts found in hostfile";
-        CHECK(hostnames.size() > 3) << "hostfile should contain more than 3 hosts";
+        CHECK(hostnames.size() > 3) << ", hostfile should contain more than 3 hosts";
         return hostnames;
     }
 

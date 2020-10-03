@@ -3,6 +3,7 @@
 
 #include "flags.h"
 #include "network_utils.h"
+#include "probe_utils.h"
 #include "utils.h"
 
 
@@ -12,17 +13,10 @@ int main(int argc, char **argv) {
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     FLAGS_v = 1;
-    const auto hostnames = Utils::readHostFile(FLAGS_hostfilePath);
+    const auto hostnames = Utils::readHostFile(FLAGS_hostfile);
     const auto currentContainerHostname = NetworkUtils::getCurrentContainerHostname();
-    const auto peerContainerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
+    const auto peerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
     const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
-
-    UDPReceiver udpReceiver = UDPReceiver(1234);
-    UDPSender udpSender = UDPSender("localhost", 1234);
-    udpSender.send("asd");
-    auto pair = udpReceiver.receive();
-    LOG(INFO) << pair.first << " <- " << pair.second;
-    udpSender.close();
-    udpReceiver.close();
+    ProbingUtils::waitForPeersToStart(peerHostnames);
     return 0;
 }

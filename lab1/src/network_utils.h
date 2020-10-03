@@ -14,7 +14,6 @@
 #include <memory>
 
 #define MAX_UDP_BUFFER_SIZE 1024
-#define HEARTBEAT_PORT 7610
 
 namespace lab1 {
     class NetworkUtils {
