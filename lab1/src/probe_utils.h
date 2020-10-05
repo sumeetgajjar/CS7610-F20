@@ -12,7 +12,7 @@
 #include <atomic>
 #include "network_utils.h"
 
-#define PROBING_PORT 7610
+#define PROBING_PORT 10000
 
 namespace lab1 {
 

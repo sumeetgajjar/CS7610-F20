@@ -6,8 +6,16 @@
 #define LAB1_MESSAGE_H
 
 #include <cstdint>
+#include <ostream>
 
 namespace lab1 {
+
+    enum MessageType : uint32_t {
+        Data = 1,
+        Ack = 2,
+        Seq = 3
+    };
+
     typedef struct {
         uint32_t type; // must be equal to 1
         uint32_t sender; // the sender’s id
@@ -30,5 +38,11 @@ namespace lab1 {
         uint32_t final_seq; // the final sequence number selected by the sender
         uint32_t final_seq_proposer; // the process id of the proposer who proposed the final_seq
     } SeqMessage;
+
+    std::ostream &operator<<(std::ostream &o, const DataMessage &dataMsg);
+
+    std::ostream &operator<<(std::ostream &o, const AckMessage &ackMsg);
+
+    std::ostream &operator<<(std::ostream &o, const SeqMessage &seqMsg);
 }
 #endif //LAB1_MESSAGE_H

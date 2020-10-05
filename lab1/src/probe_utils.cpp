@@ -100,24 +100,24 @@ namespace lab1 {
     void ProbeReceiver::startListeningForMessages() {
         LOG(INFO) << "started listening for messages";
         while (!validSenders.empty() || ProbeSender::getAliveMessageReceiverListSize() != 0) {
-            auto pair = udpReceiver.receive();
-            auto message = pair.first;
-            auto sender = pair.second;
+            auto message = udpReceiver.receive();
+            auto messageString = std::string(message.buffer);
+            auto sender = message.sender;
             // sender is of form <hostname>.<network-name>. e.g: "sumeet-g-alpha.cs7610-bridge"
             // However the hostfile just contains "sumeet-g-alpha", hence need to split the sender string
             sender = sender.substr(0, sender.find('.'));
 
-            if (message.rfind(ProbeSender::aliveMessage, 0) == 0) {
+            if (messageString.rfind(ProbeSender::aliveMessage, 0) == 0) {
                 LOG(INFO) << "received alive message from hostname: " << sender;
                 ProbeSender::sendingAckMessages(sender);
                 validSenders.erase(sender);
                 LOG(INFO) << "removed sender: " << sender << ", from validSenders, validSendersSize: "
                           << validSenders.size();
-            } else if (message.rfind(ProbeSender::ackMessage, 0) == 0) {
+            } else if (messageString.rfind(ProbeSender::ackMessage, 0) == 0) {
                 LOG(INFO) << "received ack from hostname: " << sender;
                 ProbeSender::removeFromAliveMessageReceiverList(sender);
             } else {
-                LOG(ERROR) << "unknown message from: " << sender << ", message: " << message;
+                LOG(ERROR) << "unknown message from: " << sender << ", message: " << messageString;
             }
         }
         udpReceiver.close();

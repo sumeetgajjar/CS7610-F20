@@ -18,8 +18,8 @@ namespace lab1 {
         static std::vector<std::string> getPeerContainerHostnames(const std::vector<std::string> &allHostnames,
                                                                   const std::string &currentHostname);
 
-        static unsigned int getProcessIdentifier(const std::vector<std::string> &allHostnames,
-                                                 const std::string &hostname);
+        static uint32_t getProcessIdentifier(const std::vector<std::string> &allHostnames,
+                                             const std::string &hostname);
     };
 }
 

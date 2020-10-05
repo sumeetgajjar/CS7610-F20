@@ -45,8 +45,8 @@ namespace lab1 {
         return peerHostnames;
     }
 
-    unsigned int Utils::getProcessIdentifier(const std::vector<std::string> &allHostnames,
-                                             const std::string &hostname) {
+    uint32_t Utils::getProcessIdentifier(const std::vector<std::string> &allHostnames,
+                                         const std::string &hostname) {
         VLOG(1) << "getting process identifier";
         for (unsigned int i = 0; i < allHostnames.size(); i++) {
             if (allHostnames[i] == hostname) {

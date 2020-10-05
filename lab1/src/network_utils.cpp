@@ -27,7 +27,7 @@ namespace lab1 {
                                                                    serverPort(serverPort) {
         VLOG(1) << "creating UDPSender for hostname: " << this->serverHost << ":" << this->serverPort;
         initSocket();
-    };
+    }
 
     void UDPSender::initSocket() {
         VLOG(1) << "inside initSocket() in UDPSender for hostname: " << serverHost << ":" << serverPort;
@@ -69,6 +69,20 @@ namespace lab1 {
         }
     }
 
+    void UDPSender::send(const char *buff, size_t size) {
+        VLOG(1) << "inside send() of UDPSender, host: " << serverHost << ":" << serverPort
+                << " ,buffer size: " << size;
+        if (ssize_t numbytes = sendto(sendFD, buff, size, 0, serverAddrInfo->ai_addr,
+                                      serverAddrInfo->ai_addrlen);
+                numbytes == -1) {
+            LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
+                       << ", buffer size: " << size;
+        } else {
+            LOG(INFO) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
+                      << ", buffer size: " << size;
+        }
+    }
+
     void UDPSender::close() {
         LOG(INFO) << "closing UDPSender for host: " << serverHost << ":" << serverPort;
         freeaddrinfo(serverInfoList);
@@ -77,6 +91,10 @@ namespace lab1 {
                         << ", error: " << errno << ", while closing UDPSender for host: " << serverHost
                         << ":" << serverPort;
     }
+
+    Message::Message(const char *buffer, size_t n, std::string sender) : buffer(buffer),
+                                                                         n(n),
+                                                                         sender(std::move(sender)) {}
 
     UDPReceiver::UDPReceiver(int portToListen) : portToListen(std::to_string(portToListen)) {
         VLOG(1) << "creating UDPReceiver for port: " << this->portToListen;
@@ -117,27 +135,26 @@ namespace lab1 {
         freeaddrinfo(serverInfoList);
     }
 
-    std::pair<std::string, std::string> UDPReceiver::receive() {
+    Message UDPReceiver::receive() {
         VLOG(1) << "inside receive() of UDPReceiver, port: " << portToListen;
         struct sockaddr_storage their_addr;
         socklen_t addr_len;
         addr_len = sizeof(their_addr);
 
         LOG(INFO) << "waiting for message";
+        char buffer[MAX_UDP_BUFFER_SIZE];
         memset(&buffer, 0, MAX_UDP_BUFFER_SIZE);
-        if (int numbytes = recvfrom(recvFD, buffer, MAX_UDP_BUFFER_SIZE - 1, 0, (struct sockaddr *) &their_addr,
-                                    &addr_len);
+        if (ssize_t numbytes = recvfrom(recvFD, buffer, MAX_UDP_BUFFER_SIZE - 1, 0, (struct sockaddr *) &their_addr,
+                                        &addr_len);
                 numbytes == -1) {
             std::string errorMessage("error(" + std::to_string(numbytes) + ") occurred while receiving data");
             LOG(ERROR) << errorMessage;
             throw std::runtime_error(errorMessage);
         } else {
             buffer[numbytes] = '\0';
-            std::string message(buffer);
             std::string receivedFrom = NetworkUtils::getHostnameFromSocket((struct sockaddr *) &their_addr);
-            LOG(INFO) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: "
-                      << receivedFrom << ", message: " << message;
-            return std::pair<std::string, std::string>(message, receivedFrom);
+            LOG(INFO) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
+            return Message(buffer, numbytes, receivedFrom);
         }
     }
 

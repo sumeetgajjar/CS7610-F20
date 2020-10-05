@@ -37,26 +37,32 @@ namespace lab1 {
 
         void send(const std::string &message);
 
+        void send(const char *buff, size_t size);
+
         void close();
+    };
+
+    class Message {
+    public:
+        const char *buffer;
+        const size_t n;
+        const std::string sender;
+
+    public:
+        Message(const char *buffer, size_t n, std::string sender);
     };
 
     class UDPReceiver {
     private:
         int recvFD;
         std::string portToListen;
-        char buffer[MAX_UDP_BUFFER_SIZE];
 
         void initSocket();
 
     public:
         explicit UDPReceiver(int portToListen);
 
-        /**
-         * Blocks till a message is received
-         *
-         * @return Returns a pair of (received message, hostname of the sender)
-         */
-        std::pair<std::string, std::string> receive();
+        Message receive();
 
         void close();
     };
