@@ -49,7 +49,7 @@ namespace lab1 {
                                          const std::string &hostname) {
         VLOG(1) << "getting process identifier";
         for (unsigned int i = 0; i < allHostnames.size(); i++) {
-            if (allHostnames[i] == hostname) {
+            if (allHostnames.at(i) == hostname) {
                 unsigned int processIdentifier = i + 1;
                 LOG(INFO) << "process identifier of " << hostname << " -> " << processIdentifier;
                 return processIdentifier;

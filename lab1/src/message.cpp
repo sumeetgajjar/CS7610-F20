@@ -30,4 +30,11 @@ namespace lab1 {
           << ", final_seq_proposer: " << seqMsg.final_seq_proposer;
         return o;
     }
+
+    std::ostream &operator<<(std::ostream &o, const SeqAckMessage &seqAckMsg) {
+        o << "type: " << seqAckMsg.type
+          << ", sender: " << seqAckMsg.sender
+          << ", msg_id: " << seqAckMsg.msg_id;
+        return o;
+    }
 }

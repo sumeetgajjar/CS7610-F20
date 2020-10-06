@@ -87,7 +87,7 @@ namespace lab1 {
         }
 
         if (udpSenders.find(hostname) != udpSenders.end()) {
-            return udpSenders[hostname];
+            return udpSenders.at(hostname);
         } else {
             return nullptr;
         }

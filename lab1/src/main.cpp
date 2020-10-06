@@ -10,7 +10,7 @@
 using namespace lab1;
 
 DEFINE_string(hostfile, "", "path to the hostfile");
-DEFINE_validator(hostfile, [](const char *flagname, const std::string &value) {
+DEFINE_validator(hostfile, [](const char *, const std::string &value) {
     return !value.empty();
 });
 
@@ -27,14 +27,15 @@ int main(int argc, char **argv) {
     const auto currentContainerHostname = NetworkUtils::getCurrentContainerHostname();
     const auto peerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
     const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
-    ProbingUtils::waitForPeersToStart(peerHostnames);
 
     auto multicastService = MulticastService(currentProcessIdentifier, hostnames, [](DataMessage dataMessage) {
         LOG(INFO) << "got multicast message: " << dataMessage;
-    });
+    }, 0, 0);
+
+    ProbingUtils::waitForPeersToStart(peerHostnames);
 
     std::thread multicastServiceThread([&]() {
-        multicastService.startListeningForMessages();
+        multicastService.start();
     });
 
     for (int i = 0; i < FLAGS_msgCount; ++i) {
