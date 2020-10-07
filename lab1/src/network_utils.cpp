@@ -36,9 +36,11 @@ namespace lab1 {
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_DGRAM;
 
-        int rv = getaddrinfo(serverHost.c_str(), std::to_string(serverPort).c_str(), &hints, &serverInfoList);
-        CHECK(rv == 0) << ", getaddrinfo failed, host: " << serverHost << ":" << serverPort <<
-                       ", returnValue: " << rv << ", error: " + std::string(gai_strerror(rv));
+        if (int rv = getaddrinfo(serverHost.c_str(), std::to_string(serverPort).c_str(), &hints, &serverInfoList);
+                rv != 0) {
+            throw std::runtime_error("cannot find host: " + serverHost + ", port: " + std::to_string(serverPort) +
+                                     ", getaddrinfo failed: " + std::string(gai_strerror(rv)));
+        }
 
         // loop through all the results and make a socket
         for (serverAddrInfo = serverInfoList; serverAddrInfo != nullptr; serverAddrInfo = serverAddrInfo->ai_next) {
@@ -151,7 +153,6 @@ namespace lab1 {
             LOG(ERROR) << errorMessage;
             throw std::runtime_error(errorMessage);
         } else {
-            buffer[numbytes] = '\0';
             std::string receivedFrom = NetworkUtils::getHostnameFromSocket((struct sockaddr *) &their_addr);
             LOG(INFO) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
             return Message(buffer, numbytes, receivedFrom);

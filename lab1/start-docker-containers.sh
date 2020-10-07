@@ -16,5 +16,5 @@ for HOST in $(cat hostfile); do
     --name "${HOST}" \
     --network cs7610-bridge \
     --hostname "${HOST}" \
-    sumeet-g-prj1 --hostfile /lab1/hostfile >"${HOST}".log 2>&1 &
+    sumeet-g-prj1 --hostfile /lab1/hostfile --msgCount 4 --v 1 >"${HOST}".log 2>&1 &
 done

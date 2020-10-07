@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "probe_utils.h"
+#include "utils.h"
 
 namespace lab1 {
     const std::string ProbeSender::aliveMessage = "I am alive"; // NOLINT(cert-err58-cpp)
@@ -101,8 +102,8 @@ namespace lab1 {
         LOG(INFO) << "started listening for messages";
         while (!validSenders.empty() || ProbeSender::getAliveMessageReceiverListSize() != 0) {
             auto message = udpReceiver.receive();
-            auto messageString = std::string(message.buffer);
-            auto sender = message.sender;
+            auto messageString = std::string(message.buffer, message.n);
+            auto sender = Utils::parseHostnameFromSender(message.sender);
             // sender is of form <hostname>.<network-name>. e.g: "sumeet-g-alpha.cs7610-bridge"
             // However the hostfile just contains "sumeet-g-alpha", hence need to split the sender string
             sender = sender.substr(0, sender.find('.'));

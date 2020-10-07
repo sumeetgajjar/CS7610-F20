@@ -34,7 +34,8 @@ namespace lab1 {
     std::ostream &operator<<(std::ostream &o, const SeqAckMessage &seqAckMsg) {
         o << "type: " << seqAckMsg.type
           << ", sender: " << seqAckMsg.sender
-          << ", msg_id: " << seqAckMsg.msg_id;
+          << ", msg_id: " << seqAckMsg.msg_id
+          << ", ack_sender: " << seqAckMsg.ack_sender;
         return o;
     }
 }

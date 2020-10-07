@@ -16,23 +16,22 @@ DEFINE_validator(hostfile, [](const char *, const std::string &value) {
 
 DEFINE_uint32(msgCount, 0, "number of messages to multicast");
 DEFINE_double(dropRate, 0, "ratio of messages to drop");
-DEFINE_uint64(delay, 0, "amount of network artificial delay");
+DEFINE_uint64(delay, -1, "amount of network artificial delay");
 DEFINE_uint32(intiateSnapshotCount, -1, "number of messages after which the process starts the snapshot");
 
 int main(int argc, char **argv) {
     google::InitGoogleLogging(argv[0]);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    FLAGS_v = 1;
     const auto hostnames = Utils::readHostFile(FLAGS_hostfile);
     const auto currentContainerHostname = NetworkUtils::getCurrentContainerHostname();
     const auto peerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
     const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
 
+    ProbingUtils::waitForPeersToStart(peerHostnames);
+
     auto multicastService = MulticastService(currentProcessIdentifier, hostnames, [](DataMessage dataMessage) {
         LOG(INFO) << "got multicast message: " << dataMessage;
-    }, 0, 0);
-
-    ProbingUtils::waitForPeersToStart(peerHostnames);
+    }, FLAGS_dropRate, FLAGS_delay);
 
     std::thread multicastServiceThread([&]() {
         multicastService.start();

@@ -20,6 +20,8 @@ namespace lab1 {
 
         static uint32_t getProcessIdentifier(const std::vector<std::string> &allHostnames,
                                              const std::string &hostname);
+
+        static std::string parseHostnameFromSender(const std::string &sender);
     };
 }
 

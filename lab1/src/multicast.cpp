@@ -6,6 +6,7 @@
 
 #include <utility>
 #include "multicast.h"
+#include "utils.h"
 
 namespace lab1 {
 
@@ -61,95 +62,96 @@ namespace lab1 {
         msg.type = ntohl(ptr->type);
         msg.sender = ntohl(ptr->sender);
         msg.msg_id = ntohl(ptr->msg_id);
+        msg.ack_sender = ntohl(ptr->ack_sender);
         return msg;
     }
 
 
-    char *serializeDataMessage(DataMessage dataMsg) {
+    void serializeDataMessage(DataMessage dataMsg, char *buffer) {
         VLOG(1) << "serializing data msg, dataMessage: " << dataMsg;
-        DataMessage msg;
-        msg.data = htonl(dataMsg.data);
-        msg.sender = htonl(dataMsg.sender);
-        msg.msg_id = htonl(dataMsg.msg_id);
-        msg.type = htonl(dataMsg.type);
-        char *buf = reinterpret_cast<char *>(&msg);
-        return buf;
+        auto *msg = reinterpret_cast<DataMessage *>(buffer);
+        msg->data = htonl(dataMsg.data);
+        msg->sender = htonl(dataMsg.sender);
+        msg->msg_id = htonl(dataMsg.msg_id);
+        msg->type = htonl(dataMsg.type);
     }
 
-    char *serializeAckMessage(AckMessage ackMsg) {
+    void serializeAckMessage(AckMessage ackMsg, char *buffer) {
         VLOG(1) << "serializing ack msg, AckMessage: " << ackMsg;
-        AckMessage msg;
-        msg.type = htonl(ackMsg.type);
-        msg.sender = htonl(ackMsg.sender);
-        msg.msg_id = htonl(ackMsg.msg_id);
-        msg.proposed_seq = htonl(ackMsg.proposed_seq);
-        msg.proposer = htonl(ackMsg.proposer);
-        char *buf = reinterpret_cast<char *>(&ackMsg);
-        return buf;
+        auto *msg = reinterpret_cast<AckMessage *>(buffer);
+        msg->type = htonl(ackMsg.type);
+        msg->sender = htonl(ackMsg.sender);
+        msg->msg_id = htonl(ackMsg.msg_id);
+        msg->proposed_seq = htonl(ackMsg.proposed_seq);
+        msg->proposer = htonl(ackMsg.proposer);
     }
 
-    char *serializeSeqMessage(SeqMessage seqMsg) {
+    void serializeSeqMessage(SeqMessage seqMsg, char *buffer) {
         VLOG(1) << "serializing ack msg, SeqMessage: " << seqMsg;
-        SeqMessage msg;
-        msg.type = htonl(seqMsg.type);
-        msg.sender = htonl(seqMsg.sender);
-        msg.msg_id = htonl(seqMsg.msg_id);
-        msg.final_seq = htonl(seqMsg.final_seq);
-        msg.final_seq_proposer = htonl(seqMsg.final_seq_proposer);
-        char *buf = reinterpret_cast<char *>(&msg);
-        return buf;
+        auto *msg = reinterpret_cast<SeqMessage *>(buffer);
+        msg->type = htonl(seqMsg.type);
+        msg->sender = htonl(seqMsg.sender);
+        msg->msg_id = htonl(seqMsg.msg_id);
+        msg->final_seq = htonl(seqMsg.final_seq);
+        msg->final_seq_proposer = htonl(seqMsg.final_seq_proposer);
     }
 
-    char *serializeSeqAckMessage(SeqAckMessage seqAckMsg) {
+    void serializeSeqAckMessage(SeqAckMessage seqAckMsg, char *buffer) {
         VLOG(1) << "serializing seq ack msg, seqAckMessage: " << seqAckMsg;
-        SeqAckMessage msg;
-        msg.type = htonl(seqAckMsg.type);
-        msg.sender = htonl(seqAckMsg.sender);
-        msg.msg_id = htonl(seqAckMsg.msg_id);
-        char *buf = reinterpret_cast<char *>(&msg);
-        return buf;
+        auto *msg = reinterpret_cast<SeqAckMessage *>(buffer);
+        msg->type = htonl(seqAckMsg.type);
+        msg->sender = htonl(seqAckMsg.sender);
+        msg->msg_id = htonl(seqAckMsg.msg_id);
+        msg->ack_sender = htonl(seqAckMsg.ack_sender);
     }
 
     template<typename T>
     ContinuousMsgSender<T>::ContinuousMsgSender(int sendingIntervalMillis,
-                                                std::vector<std::string> recipients,
-                                                std::function<char *(T)> serializer) :
+                                                const std::vector<std::string> &recipients,
+                                                std::function<void(T, char *)> serializer) :
             sendingInterval(sendingIntervalMillis),
-            recipients(std::move(recipients)),
-            serializer(serializer) {}
-
-    template<typename T>
-    ContinuousMsgSender<T>::MsgHolder::MsgHolder(const T &orgMsg,
-                                                 const char *serializedMsg,
-                                                 const std::vector<std::string> &recipients) :
-            orgMsg(orgMsg),
-            serializedMsg(serializedMsg) {}
-
-    template<typename T>
-    void ContinuousMsgSender<T>::startSendingMessages() {
+            recipients(recipients),
+            serializer(serializer) {
         for (const auto &recipient : recipients) {
             udpSenderMap[recipient] = std::make_shared<UDPSender>(UDPSender(recipient, MULTICAST_PORT));
         }
+    }
 
+    template<typename T>
+    ContinuousMsgSender<T>::MsgHolder::MsgHolder(const T &orgMsg,
+                                                 const std::function<void(T, char *)> &serializer,
+                                                 const std::vector<std::string> &recipients) :
+            orgMsg(orgMsg),
+            recipients(recipients.begin(), recipients.end()) {
+        serializer(orgMsg, reinterpret_cast<char *>(&serializedMsg));
+    }
+
+    template<typename T>
+    [[noreturn]] void ContinuousMsgSender<T>::startSendingMessages() {
         LOG(INFO) << "starting sending " << typeid(T).name() << " messages";
         while (true) {
             if (msgList.empty()) {
-                LOG(INFO) << "Waiting for new data messages";
+                LOG(INFO) << "Waiting for new " << typeid(T).name() << " messages";
                 std::unique_lock<std::mutex> uniqueLock(msgListMutex);
                 cv.wait(uniqueLock, [&]() { return queueContainsData; });
+                queueContainsData = false;
             }
 
             {
                 std::lock_guard<std::mutex> lockGuard(msgListMutex);
+                LOG(INFO) << "sending " << typeid(T).name() << "-messages, queueSize: " << msgList.size();
                 for (const MsgHolder &msgHolder : msgList) {
+                    LOG(INFO) << "sending " << typeid(T).name() << "-message: " << msgHolder.orgMsg.msg_id
+                              << ", recipientSize: " << msgHolder.recipients.size();
                     for (const auto &recipient : msgHolder.recipients) {
                         LOG(INFO) << "sending recipient: " << recipient << " message: " << msgHolder.orgMsg;
                         udpSenderMap.at(recipient)->send(msgHolder.serializedMsg, sizeof(T));
                     }
                 }
-                LOG(INFO) << typeid(T).name() << " sender sleeping for " << sendingInterval.count() << "ms";
-                std::this_thread::sleep_for(sendingInterval);
+                LOG(INFO) << typeid(T).name() << " sender, queueSize: " << msgList.size() << ", sleeping for "
+                          << sendingInterval.count() << "ms";
             }
+            std::this_thread::sleep_for(sendingInterval);
         }
         LOG(INFO) << "stopping sending data messages";
     }
@@ -157,12 +159,12 @@ namespace lab1 {
     template<typename T>
     void ContinuousMsgSender<T>::queueMsg(T message) {
         LOG(INFO) << "queueing " << typeid(T).name() << ": " << message;
-        auto serializedMsg = serializer(message);
         {
             std::lock_guard<std::mutex> lockGuard(msgListMutex);
-            msgList.emplace_back(message, serializedMsg, recipients);
+            msgList.emplace_back(message, serializer, recipients);
             queueContainsData = true;
         }
+        LOG(INFO) << "queued: " << message << ", " << typeid(T).name() << "-queueSize: " << msgList.size();
         cv.notify_all();
     }
 
@@ -194,11 +196,12 @@ namespace lab1 {
         return removed;
     }
 
-    MulticastService::MulticastService(uint32_t senderId, std::vector<std::string> recipients, const MsgDeliveryCb &cb,
+    MulticastService::MulticastService(uint32_t senderId, const std::vector<std::string> &recipients,
+                                       const MsgDeliveryCb &cb,
                                        double dropRate,
                                        int messageDelayMillis) :
             senderId(senderId),
-            recipients(std::move(recipients)),
+            recipients(recipients),
             dropRate(dropRate),
             messageDelay(messageDelayMillis),
             holdBackQueue(cb),
@@ -208,9 +211,12 @@ namespace lab1 {
 
         msgId = 0;
         latestSeqId = 0;
-
-        for (const auto &recipient : recipients) {
+        LOG(INFO) << "multicast recipientSize: " << this->recipients.size();
+        for (const auto &recipient : this->recipients) {
             udpSenderMap[recipient] = std::make_shared<UDPSender>(UDPSender(recipient, MULTICAST_PORT));
+
+            const auto recipientId = Utils::getProcessIdentifier(recipients, recipient);
+            recipientIdMap[recipientId] = recipient;
         }
     }
 
@@ -231,19 +237,33 @@ namespace lab1 {
         return dataMessage;
     }
 
-    AckMessage MulticastService::createAckMessage(DataMessage dataMsg) {
-        VLOG(1) << "creating ack msg for dataMsg: " << dataMsg;
-        AckMessage ackMsg;
-        ackMsg.type = MessageType::Ack;
-        ackMsg.sender = dataMsg.sender;
-        ackMsg.msg_id = dataMsg.msg_id;
-        ackMsg.proposed_seq = ++latestSeqId;
-        ackMsg.proposer = senderId;
-        return ackMsg;
+    AckMessage MulticastService::createOrGetAckMessage(DataMessage dataMsg, uint32_t proposedSeq, bool createNew) {
+        MsgIdentifier msgIdentifier(dataMsg.msg_id, dataMsg.sender);
+        if (createNew) {
+            VLOG(1) << "creating new ackMsg for dataMsg: " << dataMsg;
+            AckMessage ackMsg;
+            ackMsg.type = MessageType::Ack;
+            ackMsg.sender = dataMsg.sender;
+            ackMsg.msg_id = dataMsg.msg_id;
+            ackMsg.proposed_seq = proposedSeq;
+            ackMsg.proposer = senderId;
+            ackMessageCache[msgIdentifier] = ackMsg;
+        }
+        VLOG_IF(1, !createNew) << "using cached ack msg for dataMsg: " << dataMsg;
+        return ackMessageCache.at(msgIdentifier);
     }
 
     SeqMessage MulticastService::createSeqMessage(AckMessage ackMsg,
                                                   const std::unordered_map<uint32_t, uint32_t> &proposedSeqIds) {
+        VLOG(1) << "creating seqMsg for ackMsg: " << ackMsg;
+        std::ostringstream oss;
+        for (const auto &pair : proposedSeqIds) {
+            oss << "process " << pair.first << " -> " << pair.second << "\n";
+        }
+        VLOG(1) << "\n========================= start of proposed seq ids =========================\n"
+                << oss.str()
+                << "========================== end of proposed seq ids ==========================";
+
         auto maxElement = std::max_element(proposedSeqIds.begin(), proposedSeqIds.end(),
                                            [](const std::pair<uint32_t, uint32_t> &p1,
                                               const std::pair<uint32_t, uint32_t> &p2) {
@@ -257,9 +277,11 @@ namespace lab1 {
 
         uint32_t finalSeqId = maxElement->second;
         uint32_t finalSeqIdProposer = maxElement->first;
+        VLOG(1) << "msgId: " << ackMsg.msg_id << ", sender:" << ackMsg.sender
+                << ", finalSeq: " << finalSeqId << ", proposer: " << finalSeqIdProposer;
 
         SeqMessage seqMsg;
-        seqMsg.type = ackMsg.type;
+        seqMsg.type = MessageType::Seq;
         seqMsg.sender = ackMsg.sender;
         seqMsg.msg_id = ackMsg.msg_id;
         seqMsg.final_seq = finalSeqId;
@@ -272,6 +294,7 @@ namespace lab1 {
         seqAckMsg.type = MessageType::SeqAck;
         seqAckMsg.sender = seqMsg.sender;
         seqAckMsg.msg_id = seqMsg.msg_id;
+        seqAckMsg.ack_sender = senderId;
         return seqAckMsg;
     }
 
@@ -307,14 +330,21 @@ namespace lab1 {
 
     void MulticastService::processDataMsg(DataMessage dataMsg) {
         LOG(INFO) << "processing dataMsg: " << dataMsg;
-        auto added = holdBackQueue.addToQueue(dataMsg);
+        uint32_t proposedSeq = latestSeqId + 1;
+        auto added = holdBackQueue.addToQueue(dataMsg, proposedSeq, senderId);
+        auto ackMsg = createOrGetAckMessage(dataMsg, proposedSeq, added);
         if (added) {
-            auto ackMsg = createAckMessage(dataMsg);
-            auto buff = serializeAckMessage(ackMsg);
-            auto sender = recipientIdMap.at(dataMsg.sender);
-            delayMessage(MessageType::Ack);
-            udpSenderMap.at(sender)->send(buff, sizeof(AckMessage));
+            // If dataMsg is not added to the holdBackQueue then we don't need to increment the seqId since
+            // this dataMsg is not a new dataMsg, it is a result of retransmission. The retransmission occurs
+            // if ackMsg is not received within certain amount of time.
+            latestSeqId++;
         }
+
+        char buffer[sizeof(AckMessage)];
+        serializeAckMessage(ackMsg, reinterpret_cast<char *>(&buffer));
+        auto sender = recipientIdMap.at(dataMsg.sender);
+        delayMessage(MessageType::Ack);
+        udpSenderMap.at(sender)->send(buffer, sizeof(AckMessage));
         LOG_IF(WARNING, !added) << "received duplicate dataMsg: " << dataMsg;
     }
 
@@ -325,11 +355,14 @@ namespace lab1 {
             if (proposedSeqIdMap.find(ackMsg.msg_id) == proposedSeqIdMap.end()) {
                 proposedSeqIdMap[ackMsg.msg_id] = std::unordered_map<uint32_t, uint32_t>(recipients.size());
             }
+            proposedSeqIdMap.at(ackMsg.msg_id)[ackMsg.proposer] = ackMsg.proposed_seq;
             auto proposedSeqIds = proposedSeqIdMap.at(ackMsg.msg_id);
-            proposedSeqIds[ackMsg.proposer] = ackMsg.proposed_seq;
             if (proposedSeqIds.size() == recipients.size()) {
                 auto seqMsg = createSeqMessage(ackMsg, proposedSeqIds);
                 seqMsgSender.queueMsg(seqMsg);
+            } else {
+                LOG(INFO) << recipients.size() - proposedSeqIds.size()
+                          << " ackMsgs remaining for msgId: " << ackMsg.msg_id;
             }
         }
         LOG_IF(WARNING, !removed) << "received duplicate ackMsg: " << ackMsg;
@@ -340,18 +373,24 @@ namespace lab1 {
         auto marked = holdBackQueue.markDeliverable(seqMsg);
         if (marked) {
             latestSeqId = std::max(latestSeqId, seqMsg.final_seq);
-            auto seqAckMsg = createSeqAckMessage(seqMsg);
-            auto buff = serializeSeqAckMessage(seqAckMsg);
-            auto sender = recipientIdMap.at(seqMsg.sender);
-            delayMessage(MessageType::SeqAck);
-            udpSenderMap.at(sender)->send(buff, sizeof(SeqAckMessage));
         }
+        auto seqAckMsg = createSeqAckMessage(seqMsg);
+        char buffer[sizeof(SeqAckMessage)];
+        serializeSeqAckMessage(seqAckMsg, reinterpret_cast<char *>(&buffer));
+        auto sender = recipientIdMap.at(seqMsg.sender);
+        delayMessage(MessageType::SeqAck);
+        udpSenderMap.at(sender)->send(buffer, sizeof(SeqAckMessage));
+
+        MsgIdentifier msgIdentifier(seqMsg.msg_id, seqMsg.sender);
+        LOG(INFO) << "removing ackMsg from cache for " << msgIdentifier;
+        ackMessageCache.erase(msgIdentifier);
+
         LOG_IF(WARNING, !marked) << "received duplicate seqMsg: " << seqMsg;
     }
 
     void MulticastService::processSeqAckMsg(SeqAckMessage seqAckMsg) {
         LOG(INFO) << "processing seqAckMsg: " << seqAckMsg;
-        auto removed = seqMsgSender.removeRecipient(seqAckMsg.msg_id, recipientIdMap.at(seqAckMsg.sender));
+        auto removed = seqMsgSender.removeRecipient(seqAckMsg.msg_id, recipientIdMap.at(seqAckMsg.ack_sender));
         LOG_IF(WARNING, !removed) << "received duplicate seqAckMsg: " << seqAckMsg;
     }
 
@@ -379,10 +418,13 @@ namespace lab1 {
         msgReceiverThread.join();
     }
 
-    HoldBackQueue::PendingMsg::PendingMsg(const DataMessage &dataMsg) : dataMsg(dataMsg),
-                                                                        deliverable(false) {}
+    PendingMsg::PendingMsg(const DataMessage &dataMsg, uint32_t proposedSeq, uint32_t proposer) : dataMsg(dataMsg),
+                                                                                                  deliverable(false) {
+        seqMsg.final_seq = proposedSeq;
+        seqMsg.final_seq_proposer = proposer;
+    }
 
-    bool HoldBackQueue::PendingMsg::operator<(const HoldBackQueue::PendingMsg &other) const {
+    bool PendingMsg::operator<(const PendingMsg &other) const {
         if (seqMsg.final_seq == other.seqMsg.final_seq) {
             if (deliverable == other.deliverable) {
                 //breaking ties by using the smaller proposer
@@ -397,12 +439,12 @@ namespace lab1 {
 
     HoldBackQueue::HoldBackQueue(MsgDeliveryCb cb) : cb(std::move(cb)) {}
 
-    bool HoldBackQueue::addToQueue(DataMessage dataMsg) {
+    bool HoldBackQueue::addToQueue(DataMessage dataMsg, uint32_t proposedSeq, uint32_t proposer) {
         bool added = false;
-        auto pair = std::make_pair(dataMsg.msg_id, dataMsg.sender);
-        if (pendingMsgSet.find(pair) == pendingMsgSet.end()) {
-            pendingMsgSet.insert(pair);
-            heap.emplace_back(dataMsg);
+        MsgIdentifier msgIdentifier(dataMsg.msg_id, dataMsg.sender);
+        if (pendingMsgSet.find(msgIdentifier) == pendingMsgSet.end()) {
+            pendingMsgSet.insert(msgIdentifier);
+            heap.emplace_back(dataMsg, proposedSeq, proposer);
             added = true;
             LOG(INFO) << "adding dataMsg to holdBackQueue: " << dataMsg << ", holdBackQueue size: " << heap.size();
         }
@@ -411,30 +453,62 @@ namespace lab1 {
     }
 
     bool HoldBackQueue::markDeliverable(SeqMessage seqMsg) {
-        auto pair = std::make_pair(seqMsg.msg_id, seqMsg.sender);
+        MsgIdentifier msgIdentifier(seqMsg.msg_id, seqMsg.sender);
         bool marked = false;
-        if (pendingMsgSet.find(pair) == pendingMsgSet.end()) {
+        if (pendingMsgSet.find(msgIdentifier) != pendingMsgSet.end()) {
             for (auto &pendingMsg : heap) {
                 if (pendingMsg.dataMsg.msg_id == seqMsg.msg_id &&
                     pendingMsg.dataMsg.sender == seqMsg.sender) {
                     pendingMsg.seqMsg = seqMsg;
                     pendingMsg.deliverable = true;
                     marked = true;
+                    LOG(INFO) << "marked " << msgIdentifier << " deliverable";
                     break;
                 }
             }
             std::sort(heap.begin(), heap.end());
+            LOG(INFO) << "\n" << heap;
             auto it = heap.begin();
             while (it != heap.end() && it->deliverable) {
                 DataMessage &dataMsg = it->dataMsg;
                 LOG(INFO) << "delivering dataMsg: " << dataMsg << ", seqMsg: " << it->seqMsg;
                 cb(dataMsg);
-                pendingMsgSet.erase(std::make_pair(dataMsg.msg_id, dataMsg.sender));
+                pendingMsgSet.erase(msgIdentifier);
                 it = heap.erase(it);
             }
 
         }
         LOG_IF(WARNING, !marked) << "tried marking seqMsg which no longer exists: " << seqMsg;
         return marked;
+    }
+
+    MsgIdentifier::MsgIdentifier(uint32_t msgId, uint32_t sender) : msgId(msgId), sender(sender) {}
+
+    bool MsgIdentifier::operator==(const MsgIdentifier &other) const {
+        return msgId == other.msgId && sender == other.sender;
+    }
+
+    std::ostream &operator<<(std::ostream &o, const MsgIdentifier &msgIdentifier) {
+        o << "msgId: " << msgIdentifier.msgId
+          << ", sender: " << msgIdentifier.sender;
+        return o;
+    }
+
+    std::ostream &operator<<(std::ostream &o, const PendingMsg &pendingMsg) {
+        o << "msgId: " << pendingMsg.dataMsg.msg_id
+          << ", sender: " << pendingMsg.dataMsg.sender
+          << ", seqId: " << pendingMsg.seqMsg.final_seq
+          << ", seqIdProposer: " << pendingMsg.seqMsg.final_seq_proposer
+          << ", deliverable: " << pendingMsg.deliverable;
+        return o;
+    }
+
+    std::ostream &operator<<(std::ostream &o, const std::deque<PendingMsg> &deque) {
+        o << "============================= start of HoldBackQueue =============================\n";
+        for (const auto &pendingMsg : deque) {
+            o << pendingMsg << "\n";
+        }
+        o << "============================== end of HoldBackQueue ==============================\n";
+        return o;
     }
 }
