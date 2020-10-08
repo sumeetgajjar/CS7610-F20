@@ -15,9 +15,9 @@ DEFINE_validator(hostfile, [](const char *, const std::string &value) {
 });
 
 DEFINE_uint32(msgCount, 0, "number of messages to multicast");
-DEFINE_double(dropRate, 0, "ratio of messages to drop");
+DEFINE_double(dropRate, -1, "ratio of messages to drop");
 DEFINE_uint64(delay, -1, "amount of network artificial delay");
-DEFINE_uint32(intiateSnapshotCount, -1, "number of messages after which the process starts the snapshot");
+DEFINE_uint32(initiateSnapshotCount, -1, "number of messages after which the process starts the snapshot");
 
 int main(int argc, char **argv) {
     google::InitGoogleLogging(argv[0]);
