@@ -66,8 +66,8 @@ namespace lab1 {
             LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
                        << ", message: " << message;
         } else {
-            LOG(INFO) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
-                      << ", message: " << message;
+            VLOG(1) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
+                    << ", message: " << message;
         }
     }
 
@@ -80,8 +80,8 @@ namespace lab1 {
             LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
                        << ", buffer size: " << size;
         } else {
-            LOG(INFO) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
-                      << ", buffer size: " << size;
+            VLOG(1) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
+                    << ", buffer size: " << size;
         }
     }
 
@@ -143,7 +143,7 @@ namespace lab1 {
         socklen_t addr_len;
         addr_len = sizeof(their_addr);
 
-        LOG(INFO) << "waiting for message";
+        VLOG(1) << "waiting for message";
         char buffer[MAX_UDP_BUFFER_SIZE];
         memset(&buffer, 0, MAX_UDP_BUFFER_SIZE);
         if (ssize_t numbytes = recvfrom(recvFD, buffer, MAX_UDP_BUFFER_SIZE - 1, 0, (struct sockaddr *) &their_addr,
@@ -154,7 +154,7 @@ namespace lab1 {
             throw std::runtime_error(errorMessage);
         } else {
             std::string receivedFrom = NetworkUtils::getHostnameFromSocket((struct sockaddr *) &their_addr);
-            LOG(INFO) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
+            VLOG(1) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
             return Message(buffer, numbytes, receivedFrom);
         }
     }

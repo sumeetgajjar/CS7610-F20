@@ -141,10 +141,10 @@ namespace lab1 {
                 std::lock_guard<std::mutex> lockGuard(msgListMutex);
                 LOG(INFO) << "sending " << typeid(T).name() << "-messages, queueSize: " << msgList.size();
                 for (const MsgHolder &msgHolder : msgList) {
-                    LOG(INFO) << "sending " << typeid(T).name() << "-message: " << msgHolder.orgMsg.msg_id
-                              << ", recipientSize: " << msgHolder.recipients.size();
+                    VLOG(1) << "sending " << typeid(T).name() << "-message: " << msgHolder.orgMsg.msg_id
+                            << ", recipientSize: " << msgHolder.recipients.size();
                     for (const auto &recipient : msgHolder.recipients) {
-                        LOG(INFO) << "sending recipient: " << recipient << " message: " << msgHolder.orgMsg;
+                        VLOG(1) << "sending recipient: " << recipient << " message: " << msgHolder.orgMsg;
                         udpSenderMap.at(recipient)->send(msgHolder.serializedMsg, sizeof(T));
                     }
                 }
@@ -158,7 +158,7 @@ namespace lab1 {
 
     template<typename T>
     void ContinuousMsgSender<T>::queueMsg(T message) {
-        LOG(INFO) << "queueing " << typeid(T).name() << ": " << message;
+        VLOG(1) << "queueing " << typeid(T).name() << ": " << message;
         {
             std::lock_guard<std::mutex> lockGuard(msgListMutex);
             msgList.emplace_back(message, serializer, recipients);
@@ -170,7 +170,7 @@ namespace lab1 {
 
     template<typename T>
     bool ContinuousMsgSender<T>::removeRecipient(uint32_t messageId, const std::string &recipient) {
-        LOG(INFO) << "removing recipient: " << recipient << " for id: " << typeid(T).name() << "-" << messageId;
+        VLOG(1) << "removing recipient: " << recipient << " for id: " << typeid(T).name() << "-" << messageId;
         bool msgFound = false, removed = false;
         std::lock_guard<std::mutex> lockGuard(msgListMutex);
         for (MsgHolder &msgHolder : msgList) {
@@ -255,14 +255,14 @@ namespace lab1 {
 
     SeqMessage MulticastService::createSeqMessage(AckMessage ackMsg,
                                                   const std::unordered_map<uint32_t, uint32_t> &proposedSeqIds) {
-        VLOG(1) << "creating seqMsg for ackMsg: " << ackMsg;
         std::ostringstream oss;
         for (const auto &pair : proposedSeqIds) {
             oss << "process " << pair.first << " -> " << pair.second << "\n";
         }
-        VLOG(1) << "\n========================= start of proposed seq ids =========================\n"
-                << oss.str()
-                << "========================== end of proposed seq ids ==========================";
+        LOG(INFO) << "========================= start of proposed seq ids for msgId: " << ackMsg.msg_id
+                  << ", sender:" << ackMsg.sender << " =========================\n"
+                  << oss.str()
+                  << "========================== end of proposed seq ids ==========================";
 
         auto maxElement = std::max_element(proposedSeqIds.begin(), proposedSeqIds.end(),
                                            [](const std::pair<uint32_t, uint32_t> &p1,
@@ -277,8 +277,6 @@ namespace lab1 {
 
         uint32_t finalSeqId = maxElement->second;
         uint32_t finalSeqIdProposer = maxElement->first;
-        VLOG(1) << "msgId: " << ackMsg.msg_id << ", sender:" << ackMsg.sender
-                << ", finalSeq: " << finalSeqId << ", proposer: " << finalSeqIdProposer;
 
         SeqMessage seqMsg;
         seqMsg.type = MessageType::Seq;
@@ -286,10 +284,12 @@ namespace lab1 {
         seqMsg.msg_id = ackMsg.msg_id;
         seqMsg.final_seq = finalSeqId;
         seqMsg.final_seq_proposer = finalSeqIdProposer;
+        LOG(INFO) << "seqMsg: " << seqMsg;
         return seqMsg;
     }
 
-    SeqAckMessage MulticastService::createSeqAckMessage(SeqMessage seqMsg) {
+    SeqAckMessage MulticastService::createSeqAckMessage(SeqMessage seqMsg) const {
+        VLOG(1) << "creating SeqAckMsg for seqMsg: " << seqMsg;
         SeqAckMessage seqAckMsg;
         seqAckMsg.type = MessageType::SeqAck;
         seqAckMsg.sender = seqMsg.sender;
@@ -301,9 +301,10 @@ namespace lab1 {
     [[noreturn]] void MulticastService::startListeningForMessages() {
         LOG(INFO) << "starting listening for multicast messages";
         while (true) {
+            LOG(INFO) << "waiting for multicast messages";
             auto message = udpReceiver.receive();
             auto messageType = getMessageType(message);
-            LOG(INFO) << "received " << messageType << " msg from " << message.sender;
+            LOG(INFO) << "received " << messageType << " from " << message.sender;
             if (dropMessage(message, messageType)) {
                 continue;
             }
@@ -329,7 +330,7 @@ namespace lab1 {
     }
 
     void MulticastService::processDataMsg(DataMessage dataMsg) {
-        LOG(INFO) << "processing dataMsg: " << dataMsg;
+        VLOG(1) << "processing dataMsg: " << dataMsg;
         uint32_t proposedSeq = latestSeqId + 1;
         auto added = holdBackQueue.addToQueue(dataMsg, proposedSeq, senderId);
         auto ackMsg = createOrGetAckMessage(dataMsg, proposedSeq, added);
@@ -351,7 +352,7 @@ namespace lab1 {
     void MulticastService::processAckMsg(AckMessage ackMsg) {
         auto removed = dataMsgSender.removeRecipient(ackMsg.msg_id, recipientIdMap.at(ackMsg.proposer));
         if (removed) {
-            LOG(INFO) << "processing ackMsg: " << ackMsg;
+            VLOG(1) << "processing ackMsg: " << ackMsg;
             if (proposedSeqIdMap.find(ackMsg.msg_id) == proposedSeqIdMap.end()) {
                 proposedSeqIdMap[ackMsg.msg_id] = std::unordered_map<uint32_t, uint32_t>(recipients.size());
             }
@@ -361,15 +362,15 @@ namespace lab1 {
                 auto seqMsg = createSeqMessage(ackMsg, proposedSeqIds);
                 seqMsgSender.queueMsg(seqMsg);
             } else {
-                LOG(INFO) << recipients.size() - proposedSeqIds.size()
-                          << " ackMsgs remaining for msgId: " << ackMsg.msg_id;
+                VLOG(1) << recipients.size() - proposedSeqIds.size()
+                        << " ackMsgs remaining for msgId: " << ackMsg.msg_id;
             }
         }
         LOG_IF(WARNING, !removed) << "received duplicate ackMsg: " << ackMsg;
     }
 
     void MulticastService::processSeqMsg(SeqMessage seqMsg) {
-        LOG(INFO) << "processing seqMsg: " << seqMsg;
+        VLOG(1) << "processing seqMsg: " << seqMsg;
         auto marked = holdBackQueue.markDeliverable(seqMsg);
         if (marked) {
             latestSeqId = std::max(latestSeqId, seqMsg.final_seq);
@@ -382,14 +383,14 @@ namespace lab1 {
         udpSenderMap.at(sender)->send(buffer, sizeof(SeqAckMessage));
 
         MsgIdentifier msgIdentifier(seqMsg.msg_id, seqMsg.sender);
-        LOG(INFO) << "removing ackMsg from cache for " << msgIdentifier;
+        VLOG(1) << "removing ackMsg from cache for " << msgIdentifier;
         ackMessageCache.erase(msgIdentifier);
 
         LOG_IF(WARNING, !marked) << "received duplicate seqMsg: " << seqMsg;
     }
 
     void MulticastService::processSeqAckMsg(SeqAckMessage seqAckMsg) {
-        LOG(INFO) << "processing seqAckMsg: " << seqAckMsg;
+        VLOG(1) << "processing seqAckMsg: " << seqAckMsg;
         auto removed = seqMsgSender.removeRecipient(seqAckMsg.msg_id, recipientIdMap.at(seqAckMsg.ack_sender));
         LOG_IF(WARNING, !removed) << "received duplicate seqAckMsg: " << seqAckMsg;
     }
@@ -418,22 +419,22 @@ namespace lab1 {
         msgReceiverThread.join();
     }
 
-    PendingMsg::PendingMsg(const DataMessage &dataMsg, uint32_t proposedSeq, uint32_t proposer) : dataMsg(dataMsg),
-                                                                                                  deliverable(false) {
-        seqMsg.final_seq = proposedSeq;
-        seqMsg.final_seq_proposer = proposer;
-    }
+    PendingMsg::PendingMsg(const DataMessage &dataMsg, uint32_t proposedSeq, uint32_t proposer) :
+            dataMsg(dataMsg),
+            finalSeqId(proposedSeq),
+            finalSeqProposer(proposer),
+            deliverable(false) {}
 
     bool PendingMsg::operator<(const PendingMsg &other) const {
-        if (seqMsg.final_seq == other.seqMsg.final_seq) {
+        if (finalSeqId == other.finalSeqId) {
             if (deliverable == other.deliverable) {
                 //breaking ties by using the smaller proposer
-                return seqMsg.final_seq_proposer < other.seqMsg.final_seq_proposer;
+                return finalSeqProposer < other.finalSeqProposer;
             } else {
                 return other.deliverable;
             }
         } else {
-            return seqMsg.final_seq < other.seqMsg.final_seq;
+            return finalSeqId < other.finalSeqId;
         }
     }
 
@@ -444,9 +445,9 @@ namespace lab1 {
         MsgIdentifier msgIdentifier(dataMsg.msg_id, dataMsg.sender);
         if (pendingMsgSet.find(msgIdentifier) == pendingMsgSet.end()) {
             pendingMsgSet.insert(msgIdentifier);
-            heap.emplace_back(dataMsg, proposedSeq, proposer);
+            deque.emplace_back(dataMsg, proposedSeq, proposer);
             added = true;
-            LOG(INFO) << "adding dataMsg to holdBackQueue: " << dataMsg << ", holdBackQueue size: " << heap.size();
+            LOG(INFO) << "adding dataMsg to holdBackQueue: " << dataMsg << ", holdBackQueue size: " << deque.size();
         }
         LOG_IF(WARNING, !added) << "tried adding duplicate dataMsg to holdBackQueue: " << dataMsg;
         return added;
@@ -456,25 +457,26 @@ namespace lab1 {
         MsgIdentifier msgIdentifier(seqMsg.msg_id, seqMsg.sender);
         bool marked = false;
         if (pendingMsgSet.find(msgIdentifier) != pendingMsgSet.end()) {
-            for (auto &pendingMsg : heap) {
+            for (auto &pendingMsg : deque) {
                 if (pendingMsg.dataMsg.msg_id == seqMsg.msg_id &&
                     pendingMsg.dataMsg.sender == seqMsg.sender) {
-                    pendingMsg.seqMsg = seqMsg;
                     pendingMsg.deliverable = true;
                     marked = true;
                     LOG(INFO) << "marked " << msgIdentifier << " deliverable";
                     break;
                 }
             }
-            std::sort(heap.begin(), heap.end());
-            LOG(INFO) << "\n" << heap;
-            auto it = heap.begin();
-            while (it != heap.end() && it->deliverable) {
+            std::sort(deque.begin(), deque.end());
+            LOG(INFO) << "\n" << deque;
+            auto it = deque.begin();
+            while (it != deque.end() && it->deliverable) {
                 DataMessage &dataMsg = it->dataMsg;
-                LOG(INFO) << "delivering dataMsg: " << dataMsg << ", seqMsg: " << it->seqMsg;
+                LOG(INFO) << "delivering dataMsg: " << dataMsg
+                          << ", finalSeqId: " << it->finalSeqId
+                          << ", finalSeqProposer: " << it->finalSeqProposer;
                 cb(dataMsg);
                 pendingMsgSet.erase(msgIdentifier);
-                it = heap.erase(it);
+                it = deque.erase(it);
             }
 
         }
@@ -497,8 +499,8 @@ namespace lab1 {
     std::ostream &operator<<(std::ostream &o, const PendingMsg &pendingMsg) {
         o << "msgId: " << pendingMsg.dataMsg.msg_id
           << ", sender: " << pendingMsg.dataMsg.sender
-          << ", seqId: " << pendingMsg.seqMsg.final_seq
-          << ", seqIdProposer: " << pendingMsg.seqMsg.final_seq_proposer
+          << ", seqId: " << pendingMsg.finalSeqId
+          << ", seqIdProposer: " << pendingMsg.finalSeqProposer
           << ", deliverable: " << pendingMsg.deliverable;
         return o;
     }

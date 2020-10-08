@@ -54,5 +54,7 @@ namespace lab1 {
     std::ostream &operator<<(std::ostream &o, const SeqMessage &seqMsg);
 
     std::ostream &operator<<(std::ostream &o, const SeqAckMessage &seqAckMsg);
+
+    std::ostream &operator<<(std::ostream &o, const MessageType &messageType);
 }
 #endif //LAB1_MESSAGE_H

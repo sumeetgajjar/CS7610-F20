@@ -83,7 +83,8 @@ namespace lab1 {
     class PendingMsg {
     public:
         DataMessage dataMsg;
-        SeqMessage seqMsg;
+        uint32_t finalSeqId;
+        uint32_t finalSeqProposer;
         bool deliverable;
 
         explicit PendingMsg(const DataMessage &dataMsg, uint32_t proposedSeq, uint32_t proposer);
@@ -100,7 +101,7 @@ namespace lab1 {
         const MsgDeliveryCb cb;
         // set of pair<msgId, senderId>
         std::unordered_set<MsgIdentifier, MsgIdentifierHash> pendingMsgSet;
-        std::deque<PendingMsg> heap;
+        std::deque<PendingMsg> deque;
 
     public:
         HoldBackQueue(MsgDeliveryCb cb);
@@ -143,7 +144,7 @@ namespace lab1 {
         static SeqMessage createSeqMessage(AckMessage ackMsg,
                                            const std::unordered_map<uint32_t, uint32_t> &proposedSeqIds);
 
-        SeqAckMessage createSeqAckMessage(SeqMessage param);
+        SeqAckMessage createSeqAckMessage(SeqMessage param) const;
 
         void processDataMsg(DataMessage dataMsg);
 

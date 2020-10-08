@@ -69,9 +69,9 @@ namespace lab1 {
     }
 
     void ProbeSender::sendingAckMessages(const std::string &hostname) {
-        LOG(INFO) << "sending ack message to host: " << hostname;
+        VLOG(1) << "sending ack message to host: " << hostname;
         getUDPSender(hostname)->send(ackMessage);
-        LOG(INFO) << "ack message sent to host: " << hostname;
+        VLOG(1) << "ack message sent to host: " << hostname;
     }
 
     std::shared_ptr<UDPSender> ProbeSender::getUDPSender(const std::string &hostname) {
@@ -81,7 +81,7 @@ namespace lab1 {
             try {
                 udpSenders.insert(std::make_pair(hostname, std::make_shared<UDPSender>(UDPSender(hostname,
                                                                                                  PROBING_PORT))));
-                LOG(INFO) << "udpSenders size: " << udpSenders.size();
+                VLOG(1) << "udpSenders size: " << udpSenders.size();
             } catch (const std::runtime_error &e) {
                 LOG(ERROR) << "UDPSender creation error: " << e.what();
             }
@@ -101,6 +101,7 @@ namespace lab1 {
     void ProbeReceiver::startListeningForMessages() {
         LOG(INFO) << "started listening for messages";
         while (!validSenders.empty() || ProbeSender::getAliveMessageReceiverListSize() != 0) {
+            LOG(INFO) << "waiting for probe messages";
             auto message = udpReceiver.receive();
             auto messageString = std::string(message.buffer, message.n);
             auto sender = Utils::parseHostnameFromSender(message.sender);

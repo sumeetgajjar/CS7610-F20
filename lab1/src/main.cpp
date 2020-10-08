@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     ProbingUtils::waitForPeersToStart(peerHostnames);
 
     auto multicastService = MulticastService(currentProcessIdentifier, hostnames, [](DataMessage dataMessage) {
-        LOG(INFO) << "got multicast message: " << dataMessage;
+        VLOG(1) << "got multicast message: " << dataMessage;
     }, FLAGS_dropRate, FLAGS_delay);
 
     std::thread multicastServiceThread([&]() {

@@ -38,4 +38,20 @@ namespace lab1 {
           << ", ack_sender: " << seqAckMsg.ack_sender;
         return o;
     }
+
+    std::ostream &operator<<(std::ostream &o, const MessageType &messageType) {
+        o << [&]() {
+            switch (messageType) {
+                case Data:
+                    return "DataMsg";
+                case Ack:
+                    return "AckMsg";
+                case Seq:
+                    return "SeqMsg";
+                case SeqAck:
+                    return "SeqAckMsg";
+            }
+        }();
+        return o;
+    }
 }
