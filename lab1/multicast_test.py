@@ -15,13 +15,10 @@ NETWORK_BRIDGE_EXISTS_CMD = f'docker network ls --quiet --filter name={NETWORK_B
 NETWORK_BRIDGE_CREATE_CMD = f'docker network create --driver bridge {NETWORK_BRIDGE}'
 RUNNING_CONTAINERS_CMD = 'docker ps -a --quiet --filter name=sumeet-g*'
 STOP_CONTAINERS_CMD = 'docker stop {CONTAINERS}'
-START_CONTAINER_CMD = """docker run --rm --detach \
-    --name {HOST} \
-    --network {NETWORK_BRIDGE} \
-    --hostname {HOST} \
-    -v {LOG_DIR}:/var/log/lab1 \
-    --env GLOG_log_dir=/var/log/lab1/{HOST} \
-    sumeet-g-prj1 {VERBOSE} --hostfile /lab1/hostfile {ARGS}"""
+START_CONTAINER_CMD = "docker run --rm --detach" \
+                      " --name {HOST} --network {NETWORK_BRIDGE} --hostname {HOST}" \
+                      " -v {LOG_DIR}:/var/log/lab1 --env GLOG_log_dir=/var/log/lab1" \
+                      " sumeet-g-prj1 {VERBOSE} --hostfile /lab1/hostfile {ARGS}"
 
 
 class ProcessInfo:
@@ -112,16 +109,16 @@ class MulticastSuite(BaseSuite):
     # def tearDown(self):
     #     self.stop_running_containers()
 
-    def __get_app_args(self, host, msgCount=0, dropRate=-1, delay=-1, initiateSnapshotCount=-1) -> Dict[str, str]:
+    def __get_app_args(self, host, msgCount=0, dropRate=0, delay=0, initiateSnapshotCount=0) -> Dict[str, str]:
         return {
             'HOST': host,
             'NETWORK_BRIDGE': NETWORK_BRIDGE,
             'LOG_DIR': self.get_host_log_dir(host),
             'VERBOSE': self.get_verbose_logging_flag(),
             'ARGS': f"--msgCount {msgCount}"
-                    f" --dropRate={dropRate}"
-                    f" --delay={delay}"
-                    f" --initiateSnapshotCount={initiateSnapshotCount}"
+                    f" --dropRate {dropRate}"
+                    f" --delay {delay}"
+                    f" --initiateSnapshotCount {initiateSnapshotCount}"
         }
 
     def __get_delivery_order(self, host):

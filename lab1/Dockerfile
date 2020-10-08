@@ -25,7 +25,6 @@ COPY install-dependencies.sh conanfile.txt lab1/
 RUN cd lab1 && ./install-dependencies.sh
 
 ENV GLOG_alsologtostderr=1
-ENV GLOG_logbufsecs=10
 
 COPY hostfile CMakeLists.txt lab1/
 COPY src lab1/src
