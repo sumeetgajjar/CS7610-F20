@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
-
 import logging
 import os
 import subprocess
 import unittest
-from typing import Dict
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, List
 
-import sys
+import time
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
+def configure_logging(level=logging.INFO):
+    logger = logging.getLogger()
+    logger.setLevel(level)
+
+    log_formatter = logging.Formatter("[%(process)d] %(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    logger.addHandler(console_handler)
+
+
+configure_logging()
 
 NETWORK_BRIDGE = "cs7610-bridge"
 NETWORK_BRIDGE_EXISTS_CMD = f'docker network ls --quiet --filter name={NETWORK_BRIDGE}'
@@ -75,6 +87,14 @@ class BaseSuite(unittest.TestCase):
         return f'--v {os.getenv("VERBOSE", 0)}'
 
     @classmethod
+    def get_container_logs(cls, container_name: str):
+        p = cls.run_shell(f"docker logs {container_name}")
+        cls.assert_process_exit_status("docker logs cmd", p)
+        raw_log = p.stdout + os.linesep + p.stderr
+        log_lines = [line.strip() for line in raw_log.strip().split(os.linesep)]
+        return log_lines
+
+    @classmethod
     def __create_logs_dir(cls) -> None:
         for host in cls.HOSTS:
             host_log_dir = cls.get_host_log_dir(host)
@@ -89,7 +109,7 @@ class BaseSuite(unittest.TestCase):
         p_run = cls.run_shell(RUNNING_CONTAINERS_CMD)
         cls.assert_process_exit_status("running containers cmd", p_run)
         if p_run.stdout.strip():
-            running_containers = p_run.stdout.strip().split("\n")
+            running_containers = p_run.stdout.strip().split(os.linesep)
             logging.info(f"found running containers: {running_containers}")
             p_stop = cls.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=" ".join(running_containers)))
             cls.assert_process_exit_status("stop containers cmd", p_stop)
@@ -106,8 +126,8 @@ class MulticastSuite(BaseSuite):
     def setUp(self):
         self.stop_running_containers()
 
-    # def tearDown(self):
-    #     self.stop_running_containers()
+    def tearDown(self):
+        self.stop_running_containers()
 
     def __get_app_args(self, host, msgCount=0, dropRate=0, delay=0, initiateSnapshotCount=0) -> Dict[str, str]:
         return {
@@ -121,14 +141,30 @@ class MulticastSuite(BaseSuite):
                     f" --initiateSnapshotCount {initiateSnapshotCount}"
         }
 
-    def __get_delivery_order(self, host):
-        log_file = f'{self.get_host_log_dir(host)}/lab1.INFO'
+    def __get_delivery_order(self, host, expected_msg_count) -> List[str]:
+        delivery_order = []
+        while len(delivery_order) < expected_msg_count:
+            logs = self.get_container_logs(host)
+            delivery_order = [line.split("]")[1] for line in logs if "delivering" in line]
+            logging.info(f"{len(delivery_order)} messages were delivered to {host}")
+            time.sleep(4)
+
+        return delivery_order
 
     def test_single_sender(self):
+        msg_count = 10
         for host in self.HOSTS:
             logging.info(f"starting container for host: {host}")
-            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host, msgCount=0)))
+            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host, msgCount=msg_count)))
             self.assert_process_exit_status(f"{host} container run cmd", p_run)
+
+        with ThreadPoolExecutor(len(self.HOSTS)) as executor:
+            expected_msg_count = len(self.HOSTS) * msg_count
+            futures = [executor.submit(self.__get_delivery_order, host, expected_msg_count) for host in self.HOSTS]
+            delivery_orders = [future.result() for future in futures]
+            for ix, order in enumerate(delivery_orders[:-1]):
+                self.assertEqual(order, delivery_orders[ix + 1],
+                                 f"order of process {ix} does not match with that of process {ix + 1}")
 
 
 if __name__ == '__main__':

@@ -461,6 +461,8 @@ namespace lab1 {
                 if (pendingMsg.dataMsg.msg_id == seqMsg.msg_id &&
                     pendingMsg.dataMsg.sender == seqMsg.sender) {
                     pendingMsg.deliverable = true;
+                    pendingMsg.finalSeqId = seqMsg.final_seq;
+                    pendingMsg.finalSeqProposer = seqMsg.final_seq_proposer;
                     marked = true;
                     LOG(INFO) << "marked " << msgIdentifier << " deliverable";
                     break;
