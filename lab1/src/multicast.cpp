@@ -259,7 +259,7 @@ namespace lab1 {
         for (const auto &pair : proposedSeqIds) {
             oss << "process " << pair.first << " -> " << pair.second << "\n";
         }
-        LOG(INFO) << "========================= start of proposed seq ids for msgId: " << ackMsg.msg_id
+        LOG(INFO) << "\n========================= start of proposed seq ids for msgId: " << ackMsg.msg_id
                   << ", sender:" << ackMsg.sender << " =========================\n"
                   << oss.str()
                   << "========================== end of proposed seq ids ==========================";
