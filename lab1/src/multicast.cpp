@@ -404,10 +404,10 @@ namespace lab1 {
     void MulticastService::delayMessage(MessageType type) {
         // Delay only 50% of the messages
         bool delayMessage = messageDelay.count() != 0 && Utils::getRandomNumber(0, 1) < 0.5;
+        LOG_IF(WARNING, delayMessage) << "delaying messageType: " << type << " by " << messageDelay.count() << "ms";
         if (delayMessage) {
             std::this_thread::sleep_for(messageDelay);
         }
-        LOG_IF(WARNING, delayMessage) << "delaying messageType: " << type << " by " << messageDelay.count() << "ms";
     }
 
     void MulticastService::start() {

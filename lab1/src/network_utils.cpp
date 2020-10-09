@@ -64,7 +64,7 @@ namespace lab1 {
                                   serverAddrInfo->ai_addrlen);
                 numbytes == -1) {
             LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
-                       << ", message: " << message;
+                       << ", message: " << message << ", errno: " << errno;
         } else {
             VLOG(1) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
                     << ", message: " << message;
@@ -78,7 +78,7 @@ namespace lab1 {
                                       serverAddrInfo->ai_addrlen);
                 numbytes == -1) {
             LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
-                       << ", buffer size: " << size;
+                       << ", buffer size: " << size << ", errno: " << errno;
         } else {
             VLOG(1) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
                     << ", buffer size: " << size;
@@ -149,7 +149,7 @@ namespace lab1 {
         if (ssize_t numbytes = recvfrom(recvFD, buffer, MAX_UDP_BUFFER_SIZE - 1, 0, (struct sockaddr *) &their_addr,
                                         &addr_len);
                 numbytes == -1) {
-            std::string errorMessage("error(" + std::to_string(numbytes) + ") occurred while receiving data");
+            std::string errorMessage("error(" + std::to_string(errno) + ") occurred while receiving data");
             LOG(ERROR) << errorMessage;
             throw std::runtime_error(errorMessage);
         } else {

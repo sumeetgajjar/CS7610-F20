@@ -1,0 +1,4 @@
+- please always always always build docker image after making changes to hostfile
+- while the container is running the docker logs are best 
+- once the container has exited the logs can be found under logs/<container-name>/lab1.INFO file
+- to increase the verbosity of logging run with VERBOSE=1; python3 -m unittest test_multicast.MulticastSuite.<testname>

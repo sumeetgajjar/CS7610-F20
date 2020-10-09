@@ -119,6 +119,7 @@ class BaseSuite(unittest.TestCase):
 
     @classmethod
     def stop_running_containers(cls) -> None:
+        logging.info("stopping running containers")
         p_run = cls.run_shell(RUNNING_CONTAINERS_CMD)
         cls.assert_process_exit_status("running containers cmd", p_run)
         if p_run.stdout.strip():
@@ -136,7 +137,10 @@ class MulticastSuite(BaseSuite):
     def setUpClass(cls):
         return super().setUpClass()
 
-    def setUp(self):
+    def setUp(self) -> None:
+        self.stop_running_containers()
+
+    def tearDown(self) -> None:
         self.stop_running_containers()
 
     def __get_app_args(self, host: str, senders: List[str],
@@ -162,13 +166,15 @@ class MulticastSuite(BaseSuite):
             if "delivering" in line:
                 delivery_msg = line.split("]")[1]
                 delivery_order.append(delivery_msg)
-                logging.info(f"Found delivery message for host: {host}, message: {delivery_msg}")
+                logging.info(f"found delivery message for host: {host}, message: {delivery_msg}")
+
             return len(delivery_order) < expected_msg_count
 
         cls.tail_container_logs(host, __callback)
         return delivery_order
 
-    def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0, delay=0, initiate_snapshot_count=0):
+    def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0.0, delay=0, initiate_snapshot_count=0):
+        logging.info(f"senders for the test: {senders}")
         for host in self.HOSTS:
             logging.info(f"starting container for host: {host}")
             p_run = self.run_shell(
@@ -187,7 +193,25 @@ class MulticastSuite(BaseSuite):
                                  f"order of process {ix} does not match with that of process {ix + 1}")
 
     def test_single_sender(self):
-        self.__test_wrapper(senders=self.HOSTS[0:2], msg_count=1)
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2)
+
+    def test_two_senders(self):
+        self.__test_wrapper(senders=self.HOSTS[0:2], msg_count=2)
+
+    def test_all_senders(self):
+        self.__test_wrapper(senders=self.HOSTS, msg_count=2)
+
+    def test_drop_half_messages(self):
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.5)
+
+    def test_drop_majority_messages(self):
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.75)
+
+    def test_delay_messages(self):
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, delay=10000)
+
+    def test_drop_delay_messages(self):
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.25, delay=10000)
 
 
 if __name__ == '__main__':
