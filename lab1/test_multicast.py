@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
 import logging
 import os
 import subprocess
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List
+from typing import Dict, List, Callable
 
 
 def configure_logging(level=logging.INFO):
@@ -42,7 +41,7 @@ class ProcessInfo:
 
 class BaseSuite(unittest.TestCase):
     HOSTS = []
-    LOG_ROOT = 'logs'
+    LOG_ROOT_DIR = 'logs'
 
     @classmethod
     def setUpClass(cls):
@@ -78,10 +77,10 @@ class BaseSuite(unittest.TestCase):
 
     @classmethod
     def get_host_log_dir(cls, host: str) -> str:
-        return os.path.abspath(f'{cls.LOG_ROOT}/{host}')
+        return os.path.abspath(f'{cls.LOG_ROOT_DIR}/{host}')
 
     @classmethod
-    def get_verbose_logging_flag(cls):
+    def get_verbose_logging_flag(cls) -> str:
         return f'--v {os.getenv("VERBOSE", 0)}'
 
     @classmethod
@@ -93,7 +92,7 @@ class BaseSuite(unittest.TestCase):
         return log_lines
 
     @classmethod
-    def tail_container_logs(cls, container_name: str, callback) -> None:
+    def tail_container_logs(cls, container_name: str, callback: Callable[[str], bool]) -> None:
         continue_tailing = True
         with subprocess.Popen(['docker', 'logs', container_name, '-f'],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
@@ -173,7 +172,17 @@ class MulticastSuite(BaseSuite):
         cls.tail_container_logs(host, __callback)
         return delivery_order
 
-    def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0.0, delay=0, initiate_snapshot_count=0):
+    def __assert_ordering_is_same_for_all_processes(self, expected_msg_count: int) -> None:
+        with ThreadPoolExecutor(len(self.HOSTS)) as executor:
+            futures = [executor.submit(self.__get_delivery_order, host, expected_msg_count)
+                       for host in self.HOSTS]
+            delivery_orders = [future.result() for future in futures]
+            for ix, order in enumerate(delivery_orders[:-1]):
+                self.assertEqual(order, delivery_orders[ix + 1],
+                                 f"order of process {ix} does not match with that of process {ix + 1}")
+
+    def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0.0, delay=0,
+                       initiate_snapshot_count=0) -> None:
         logging.info(f"senders for the test: {senders}")
         for host in self.HOSTS:
             logging.info(f"starting container for host: {host}")
@@ -183,14 +192,8 @@ class MulticastSuite(BaseSuite):
                                                                  initiate_snapshot_count=initiate_snapshot_count)))
             self.assert_process_exit_status(f"{host} container run cmd", p_run)
 
-        with ThreadPoolExecutor(len(self.HOSTS)) as executor:
-            expected_msg_count = len(senders) * msg_count
-            futures = [executor.submit(self.__get_delivery_order, host, expected_msg_count)
-                       for host in self.HOSTS]
-            delivery_orders = [future.result() for future in futures]
-            for ix, order in enumerate(delivery_orders[:-1]):
-                self.assertEqual(order, delivery_orders[ix + 1],
-                                 f"order of process {ix} does not match with that of process {ix + 1}")
+        expected_msg_count = len(senders) * msg_count
+        self.__assert_ordering_is_same_for_all_processes(expected_msg_count)
 
     def test_single_sender(self):
         self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2)
