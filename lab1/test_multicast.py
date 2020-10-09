@@ -60,7 +60,7 @@ class BaseSuite(unittest.TestCase):
 
     @classmethod
     def run_shell(cls, cmd: str) -> ProcessInfo:
-        logging.info(f"running cmd: {cmd}")
+        logging.debug(f"running cmd: {cmd}")
         p = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return ProcessInfo(p.returncode, p.stdout.decode('UTF-8'), p.stderr.decode('UTF-8'))
 
@@ -184,6 +184,8 @@ class MulticastSuite(BaseSuite):
     def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0.0, delay=0,
                        initiate_snapshot_count=0) -> None:
         logging.info(f"senders for the test: {senders}")
+        logging.info(f"args: msgCount:{msg_count}, dropRate: {drop_rate}, delay:{delay}, "
+                     f"initiateSnapshotCount:{initiate_snapshot_count}")
         for host in self.HOSTS:
             logging.info(f"starting container for host: {host}")
             p_run = self.run_shell(
@@ -193,6 +195,7 @@ class MulticastSuite(BaseSuite):
             self.assert_process_exit_status(f"{host} container run cmd", p_run)
 
         expected_msg_count = len(senders) * msg_count
+        logging.info("grepping message delivery in process logs")
         self.__assert_ordering_is_same_for_all_processes(expected_msg_count)
 
     def test_single_sender(self):
