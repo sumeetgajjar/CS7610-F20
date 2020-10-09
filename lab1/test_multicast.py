@@ -201,13 +201,13 @@ class MulticastSuite(BaseSuite):
         self.__assert_ordering_is_same_for_all_processes(expected_msg_count)
 
     def test_single_sender(self):
-        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2)
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=4)
 
     def test_two_senders(self):
-        self.__test_wrapper(senders=self.HOSTS[0:2], msg_count=2)
+        self.__test_wrapper(senders=self.HOSTS[0:2], msg_count=4)
 
     def test_all_senders(self):
-        self.__test_wrapper(senders=self.HOSTS, msg_count=2)
+        self.__test_wrapper(senders=self.HOSTS, msg_count=4)
 
     def test_drop_half_messages(self):
         self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.5)
