@@ -9,8 +9,11 @@
 #include <set>
 #include <fstream>
 #include <glog/logging.h>
+#include <random>
 
 namespace lab1 {
+
+    static std::default_random_engine randomEngine(11);
 
 
     std::vector<std::string> Utils::readHostFile(const std::string &hostFilePath) {
@@ -62,5 +65,10 @@ namespace lab1 {
         // sender is of form <hostname>.<network-name>. e.g: "sumeet-g-alpha.cs7610-bridge"
         // However the hostfile just contains "sumeet-g-alpha", hence need to split the sender string
         return sender.substr(0, sender.find('.'));
+    }
+
+    double Utils::getRandomNumber(double min, double max) {
+        std::uniform_real_distribution<double> distribution(min, max);
+        return distribution(randomEngine);
     }
 }

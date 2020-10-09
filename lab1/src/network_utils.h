@@ -18,7 +18,7 @@
 namespace lab1 {
     class NetworkUtils {
     public:
-        static std::string getCurrentContainerHostname();
+        static std::string getCurrentHostname();
 
         static std::string getHostnameFromSocket(sockaddr *sockaddr);
     };

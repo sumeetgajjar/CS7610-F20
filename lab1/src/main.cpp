@@ -14,10 +14,10 @@ DEFINE_string(hostfile, "", "path to the hostfile");
 DEFINE_validator(hostfile, [](const char *, const std::string &value) {
     return !value.empty();
 });
-
+DEFINE_string(senders, "", "comma separated list of hostnames of the senders");
 DEFINE_uint32(msgCount, 0, "number of messages to multicast");
 DEFINE_double(dropRate, 0, "ratio of messages to drop");
-DEFINE_uint64(delay, 0, "amount of network artificial delay");
+DEFINE_uint64(delay, 0, "amount of network artificial delay in millis");
 DEFINE_uint32(initiateSnapshotCount, 0, "number of messages after which the process starts the snapshot");
 
 void handleSignal(int signalNum) {
@@ -36,9 +36,20 @@ int main(int argc, char **argv) {
         gflags::ParseCommandLineFlags(&argc, &argv, true);
         registerSignalHandlers();
         const auto hostnames = Utils::readHostFile(FLAGS_hostfile);
-        const auto currentContainerHostname = NetworkUtils::getCurrentContainerHostname();
-        const auto peerHostnames = Utils::getPeerContainerHostnames(hostnames, currentContainerHostname);
-        const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentContainerHostname);
+        const auto currentHostname = NetworkUtils::getCurrentHostname();
+        const auto peerHostnames = Utils::getPeerContainerHostnames(hostnames, currentHostname);
+        const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentHostname);
+        const auto sendMulticastMsg = [&]() {
+            std::stringstream ss(FLAGS_senders);
+            std::string sender;
+            while (getline(ss, sender, ',')) {
+                if (sender == currentHostname) {
+                    LOG(INFO) << currentHostname << " is part of senders group";
+                    return true;
+                }
+            }
+            return false;
+        }();
 
         ProbingUtils::waitForPeersToStart(peerHostnames);
 
@@ -50,8 +61,10 @@ int main(int argc, char **argv) {
             multicastService.start();
         });
 
-        for (int i = 0; i < FLAGS_msgCount; ++i) {
-            multicastService.multicast(i + 11);
+        if (sendMulticastMsg) {
+            for (int i = 0; i < FLAGS_msgCount; ++i) {
+                multicastService.multicast(i + 11);
+            }
         }
 
         multicastServiceThread.join();

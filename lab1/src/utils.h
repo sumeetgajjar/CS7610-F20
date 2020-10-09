@@ -22,6 +22,8 @@ namespace lab1 {
                                              const std::string &hostname);
 
         static std::string parseHostnameFromSender(const std::string &sender);
+
+        static double getRandomNumber(double min = 0, double max = 1);
     };
 }
 

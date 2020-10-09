@@ -6,7 +6,7 @@
 #include "network_utils.h"
 
 namespace lab1 {
-    std::string NetworkUtils::getCurrentContainerHostname() {
+    std::string NetworkUtils::getCurrentHostname() {
         VLOG(1) << "getting current host";
         char hostname[HOST_NAME_MAX];
         int status = gethostname(hostname, HOST_NAME_MAX);

@@ -396,16 +396,17 @@ namespace lab1 {
     }
 
     bool MulticastService::dropMessage(const Message &message, MessageType type) const {
-        //todo implement this
-        double random = 10000;
-        bool dropMessage = random < dropRate;
-        LOG_IF(WARNING, dropMessage) << "dropping " << type << " message from: " << message.sender;
+        bool dropMessage = Utils::getRandomNumber(0, 1) < dropRate;
+        LOG_IF(WARNING, dropMessage) << "dropping " << type << " from: " << message.sender;
         return dropMessage;
     }
 
     void MulticastService::delayMessage(MessageType type) {
-        //todo implement this
-        bool delayMessage = false;
+        // Delay only 50% of the messages
+        bool delayMessage = messageDelay.count() != 0 && Utils::getRandomNumber(0, 1) < 0.5;
+        if (delayMessage) {
+            std::this_thread::sleep_for(messageDelay);
+        }
         LOG_IF(WARNING, delayMessage) << "delaying messageType: " << type << " by " << messageDelay.count() << "ms";
     }
 

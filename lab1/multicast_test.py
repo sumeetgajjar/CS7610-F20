@@ -6,8 +6,6 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List
 
-import time
-
 
 def configure_logging(level=logging.INFO):
     logger = logging.getLogger()
@@ -75,7 +73,7 @@ class BaseSuite(unittest.TestCase):
             logging.info(f"docker network bridge: {NETWORK_BRIDGE} exists")
         else:
             logging.info("docker network bridge does not exists, creating one")
-            p_create = cls.run_shell(NETWORK_BRIDGE_CREATE_CMD.split(" "))
+            p_create = cls.run_shell(NETWORK_BRIDGE_CREATE_CMD)
             cls.assert_process_exit_status("network bridge create cmd", p_create)
 
     @classmethod
@@ -87,12 +85,27 @@ class BaseSuite(unittest.TestCase):
         return f'--v {os.getenv("VERBOSE", 0)}'
 
     @classmethod
-    def get_container_logs(cls, container_name: str):
+    def get_container_logs(cls, container_name: str) -> List[str]:
         p = cls.run_shell(f"docker logs {container_name}")
         cls.assert_process_exit_status("docker logs cmd", p)
         raw_log = p.stdout + os.linesep + p.stderr
         log_lines = [line.strip() for line in raw_log.strip().split(os.linesep)]
         return log_lines
+
+    @classmethod
+    def tail_container_logs(cls, container_name: str, callback) -> None:
+        continue_tailing = True
+        with subprocess.Popen(['docker', 'logs', container_name, '-f'],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
+            while continue_tailing:
+                line = p.stderr.readline()
+                if not line:
+                    break
+
+                line = line.decode('UTF-8')
+                continue_tailing = callback(line)
+
+            p.kill()
 
     @classmethod
     def __create_logs_dir(cls) -> None:
@@ -126,45 +139,55 @@ class MulticastSuite(BaseSuite):
     def setUp(self):
         self.stop_running_containers()
 
-    def tearDown(self):
-        self.stop_running_containers()
-
-    def __get_app_args(self, host, msgCount=0, dropRate=0, delay=0, initiateSnapshotCount=0) -> Dict[str, str]:
+    def __get_app_args(self, host: str, senders: List[str],
+                       msg_count, drop_rate, delay, initiate_snapshot_count) -> Dict[str, str]:
         return {
             'HOST': host,
             'NETWORK_BRIDGE': NETWORK_BRIDGE,
             'LOG_DIR': self.get_host_log_dir(host),
             'VERBOSE': self.get_verbose_logging_flag(),
-            'ARGS': f"--msgCount {msgCount}"
-                    f" --dropRate {dropRate}"
+            'ARGS': f" --senders {','.join(senders)}"
+                    f" --msgCount {msg_count}"
+                    f" --dropRate {drop_rate}"
                     f" --delay {delay}"
-                    f" --initiateSnapshotCount {initiateSnapshotCount}"
+                    f" --initiateSnapshotCount {initiate_snapshot_count}"
         }
 
-    def __get_delivery_order(self, host, expected_msg_count) -> List[str]:
+    @classmethod
+    def __get_delivery_order(cls, host: str, expected_msg_count: int) -> List[str]:
         delivery_order = []
-        while len(delivery_order) < expected_msg_count:
-            logs = self.get_container_logs(host)
-            delivery_order = [line.split("]")[1] for line in logs if "delivering" in line]
-            logging.info(f"{len(delivery_order)} messages were delivered to {host}")
-            time.sleep(4)
 
+        def __callback(line: str) -> bool:
+            line = line.strip()
+            if "delivering" in line:
+                delivery_msg = line.split("]")[1]
+                delivery_order.append(delivery_msg)
+                logging.info(f"Found delivery message for host: {host}, message: {delivery_msg}")
+            return len(delivery_order) < expected_msg_count
+
+        cls.tail_container_logs(host, __callback)
         return delivery_order
 
-    def test_single_sender(self):
-        msg_count = 10
+    def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0, delay=0, initiate_snapshot_count=0):
         for host in self.HOSTS:
             logging.info(f"starting container for host: {host}")
-            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host, msgCount=msg_count)))
+            p_run = self.run_shell(
+                START_CONTAINER_CMD.format(**self.__get_app_args(host, senders=senders, msg_count=msg_count,
+                                                                 drop_rate=drop_rate, delay=delay,
+                                                                 initiate_snapshot_count=initiate_snapshot_count)))
             self.assert_process_exit_status(f"{host} container run cmd", p_run)
 
         with ThreadPoolExecutor(len(self.HOSTS)) as executor:
-            expected_msg_count = len(self.HOSTS) * msg_count
-            futures = [executor.submit(self.__get_delivery_order, host, expected_msg_count) for host in self.HOSTS]
+            expected_msg_count = len(senders) * msg_count
+            futures = [executor.submit(self.__get_delivery_order, host, expected_msg_count)
+                       for host in self.HOSTS]
             delivery_orders = [future.result() for future in futures]
             for ix, order in enumerate(delivery_orders[:-1]):
                 self.assertEqual(order, delivery_orders[ix + 1],
                                  f"order of process {ix} does not match with that of process {ix + 1}")
+
+    def test_single_sender(self):
+        self.__test_wrapper(senders=self.HOSTS[0:2], msg_count=1)
 
 
 if __name__ == '__main__':
