@@ -27,7 +27,7 @@ STOP_CONTAINERS_CMD = 'docker stop {CONTAINERS}'
 START_CONTAINER_CMD = "docker run --rm --detach" \
                       " --name {HOST} --network {NETWORK_BRIDGE} --hostname {HOST}" \
                       " -v {LOG_DIR}:/var/log/lab1 --env GLOG_log_dir=/var/log/lab1" \
-                      " sumeet-g-prj1 {VERBOSE} --hostfile /lab1/hostfile {ARGS}"
+                      " sumeet-g-prj1 {VERBOSE} --hostfile /hostfile {ARGS}"
 
 
 class ProcessInfo:
@@ -177,15 +177,17 @@ class MulticastSuite(BaseSuite):
             futures = [executor.submit(self.__get_delivery_order, host, expected_msg_count)
                        for host in self.HOSTS]
             delivery_orders = [future.result() for future in futures]
-            for ix, order in enumerate(delivery_orders[:-1]):
-                self.assertEqual(order, delivery_orders[ix + 1],
-                                 f"order of process {ix} does not match with that of process {ix + 1}")
+
+            for ix, delivery_order in enumerate(delivery_orders):
+                self.assertTrue(delivery_order)
+                self.assertEqual(delivery_orders[0], delivery_order,
+                                 f"order of process {ix} does not match with that of process {0}")
 
     def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0.0, delay=0,
                        initiate_snapshot_count=0) -> None:
         logging.info(f"senders for the test: {senders}")
-        logging.info(f"args: msgCount:{msg_count}, dropRate: {drop_rate}, delay:{delay}, "
-                     f"initiateSnapshotCount:{initiate_snapshot_count}")
+        logging.info(f"args: msgCount: {msg_count}, dropRate: {drop_rate}, delay: {delay}, "
+                     f"initiateSnapshotCount: {initiate_snapshot_count}")
         for host in self.HOSTS:
             logging.info(f"starting container for host: {host}")
             p_run = self.run_shell(
