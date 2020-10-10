@@ -37,7 +37,8 @@ namespace lab1 {
 
         };
 
-        const std::chrono::milliseconds sendingInterval;
+        int retryCount;
+        const long maxSendingIntervalMillis;
         const std::vector<std::string> recipients;
         const std::function<void(T, char *)> serializer;
         UdpSenderMap udpSenderMap;
@@ -46,9 +47,11 @@ namespace lab1 {
         bool queueContainsData = false;
         std::vector<MsgHolder> msgList;
 
+        long getSendingInterval();
+
     public:
 
-        ContinuousMsgSender(int sendingIntervalMillis,
+        ContinuousMsgSender(int maxSendingIntervalMillis,
                             const std::vector<std::string> &recipients,
                             std::function<void(T, char *)> serializer);
 

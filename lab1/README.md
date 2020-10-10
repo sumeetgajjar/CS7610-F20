@@ -4,6 +4,7 @@
     - what happens here
     - delivery message content is checked for all processes, by transitivity
 
+- the retry interval is 200ms and then it grows exponentially
 
 - dropping will show data and seq majorly due to the continuous message based design
 - delaying of messages when enabled is applied to only 50% of the messages

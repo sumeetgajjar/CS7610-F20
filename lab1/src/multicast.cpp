@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 
 #include <utility>
+#include <cmath>
 #include "multicast.h"
 #include "utils.h"
 
@@ -106,12 +107,13 @@ namespace lab1 {
     }
 
     template<typename T>
-    ContinuousMsgSender<T>::ContinuousMsgSender(int sendingIntervalMillis,
+    ContinuousMsgSender<T>::ContinuousMsgSender(int maxSendingIntervalMillis,
                                                 const std::vector<std::string> &recipients,
                                                 std::function<void(T, char *)> serializer) :
-            sendingInterval(sendingIntervalMillis),
+            maxSendingIntervalMillis(maxSendingIntervalMillis),
             recipients(recipients),
             serializer(serializer) {
+        retryCount = 0;
         for (const auto &recipient : recipients) {
             udpSenderMap[recipient] = std::make_shared<UDPSender>(UDPSender(recipient, MULTICAST_PORT));
         }
@@ -148,10 +150,11 @@ namespace lab1 {
                         udpSenderMap.at(recipient)->send(msgHolder.serializedMsg, sizeof(T));
                     }
                 }
-                LOG(INFO) << typeid(T).name() << " sender, queueSize: " << msgList.size() << ", sleeping for "
-                          << sendingInterval.count() << "ms";
             }
-            std::this_thread::sleep_for(sendingInterval);
+            std::chrono::milliseconds milliseconds{getSendingInterval()};
+            LOG(INFO) << typeid(T).name() << " sender, queueSize: " << msgList.size() << ", sleeping for "
+                      << milliseconds.count() << "ms";
+            std::this_thread::sleep_for(milliseconds);
         }
         LOG(INFO) << "stopping sending data messages";
     }
@@ -194,6 +197,17 @@ namespace lab1 {
 
         LOG_IF(WARNING, !msgFound) << "duplicate remove for message id: " << typeid(T).name() << "-" << messageId;
         return removed;
+    }
+
+    template<typename T>
+    long ContinuousMsgSender<T>::getSendingInterval() {
+
+        long interval = std::pow(2, retryCount++) * 200;
+        if (interval > maxSendingIntervalMillis) {
+            retryCount = 0;
+            interval = 200;
+        }
+        return interval;
     }
 
     MulticastService::MulticastService(uint32_t senderId, const std::vector<std::string> &recipients,

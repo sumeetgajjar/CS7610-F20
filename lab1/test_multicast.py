@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import logging
 import os
 import subprocess
@@ -24,6 +25,7 @@ NETWORK_BRIDGE_EXISTS_CMD = f'docker network ls --quiet --filter name={NETWORK_B
 NETWORK_BRIDGE_CREATE_CMD = f'docker network create --driver bridge {NETWORK_BRIDGE}'
 RUNNING_CONTAINERS_CMD = 'docker ps -a --quiet --filter name=sumeet-g*'
 STOP_CONTAINERS_CMD = 'docker stop {CONTAINERS}'
+REMOVE_CONTAINERS_CMD = 'docker rm {CONTAINERS}'
 START_CONTAINER_CMD = "docker run --rm --detach" \
                       " --name {HOST} --network {NETWORK_BRIDGE} --hostname {HOST}" \
                       " -v {LOG_DIR}:/var/log/lab1 --env GLOG_log_dir=/var/log/lab1" \
@@ -117,7 +119,7 @@ class BaseSuite(unittest.TestCase):
                 os.makedirs(host_log_dir, exist_ok=True)
 
     @classmethod
-    def stop_running_containers(cls) -> None:
+    def stop_and_remove_running_containers(cls) -> None:
         logging.info("stopping running containers")
         p_run = cls.run_shell(RUNNING_CONTAINERS_CMD)
         cls.assert_process_exit_status("running containers cmd", p_run)
@@ -126,6 +128,7 @@ class BaseSuite(unittest.TestCase):
             logging.info(f"found running containers: {running_containers}")
             p_stop = cls.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=" ".join(running_containers)))
             cls.assert_process_exit_status("stop containers cmd", p_stop)
+            p_remove = cls.run_shell(REMOVE_CONTAINERS_CMD.format(CONTAINERS=" ".join(running_containers)))
         else:
             logging.info("no running containers found")
 
@@ -137,10 +140,10 @@ class MulticastSuite(BaseSuite):
         return super().setUpClass()
 
     def setUp(self) -> None:
-        self.stop_running_containers()
+        self.stop_and_remove_running_containers()
 
     def tearDown(self) -> None:
-        self.stop_running_containers()
+        self.stop_and_remove_running_containers()
 
     def __get_app_args(self, host: str, senders: List[str],
                        msg_count, drop_rate, delay, initiate_snapshot_count) -> Dict[str, str]:
