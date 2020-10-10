@@ -219,10 +219,10 @@ class MulticastSuite(BaseSuite):
         self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.75)
 
     def test_delay_messages(self):
-        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, delay=10000)
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, delay=2000)
 
     def test_drop_delay_messages(self):
-        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.25, delay=10000)
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.25, delay=2000)
 
 
 if __name__ == '__main__':
