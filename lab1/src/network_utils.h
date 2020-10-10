@@ -14,17 +14,30 @@
 #include <memory>
 
 #define MAX_UDP_BUFFER_SIZE 1024
+#define MAX_TCP_BUFFER_SIZE 1024
+#define TCP_BACKLOG_QUEUE_SIZE 20
 
 namespace lab1 {
     class NetworkUtils {
     public:
         static std::string getCurrentHostname();
 
-        static std::string getHostnameFromSocket(sockaddr *sockaddr);
+        static std::string getHostnameFromSocket(sockaddr_storage *sockaddrStorage);
+
+        static std::string getServiceNameFromSocket(sockaddr_storage *sockaddrStorage);
+    };
+
+    class Message {
+    public:
+        const char *buffer;
+        const size_t n;
+        const std::string sender;
+
+    public:
+        Message(const char *buffer, size_t n, std::string sender);
     };
 
     class UDPSender {
-    private:
         std::string serverHost;
         int serverPort;
         int sendFD;
@@ -42,18 +55,7 @@ namespace lab1 {
         void close();
     };
 
-    class Message {
-    public:
-        const char *buffer;
-        const size_t n;
-        const std::string sender;
-
-    public:
-        Message(const char *buffer, size_t n, std::string sender);
-    };
-
     class UDPReceiver {
-    private:
         int recvFD;
         std::string portToListen;
 
@@ -63,6 +65,43 @@ namespace lab1 {
         explicit UDPReceiver(int portToListen);
 
         Message receive();
+
+        void close();
+    };
+
+    class TcpClient {
+
+        const std::string hostname;
+        const int port;
+        int sockFd;
+
+    public:
+        TcpClient(std::string hostname, int port, int fd);
+
+        TcpClient(std::string hostname, int port);
+
+        const std::string &getHostname() const;
+
+        int getPort() const;
+
+        void send(const char *buff, size_t size);
+
+        Message receive();
+
+        void close();
+    };
+
+    class TcpServer {
+
+        const int listeningPort;
+        int sockFd;
+
+        void initSocket();
+
+    public:
+        TcpServer(int listeningPort);
+
+        TcpClient accept();
 
         void close();
     };

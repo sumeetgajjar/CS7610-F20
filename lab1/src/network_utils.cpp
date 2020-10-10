@@ -6,6 +6,7 @@
 #include "network_utils.h"
 
 namespace lab1 {
+
     std::string NetworkUtils::getCurrentHostname() {
         VLOG(1) << "getting current host";
         char hostname[HOST_NAME_MAX];
@@ -15,13 +16,27 @@ namespace lab1 {
         return std::string(hostname);
     }
 
-    std::string NetworkUtils::getHostnameFromSocket(sockaddr *sockaddr) {
+    std::string NetworkUtils::getHostnameFromSocket(sockaddr_storage *sockaddrStorage) {
+        struct sockaddr *sockaddr = (struct sockaddr *) sockaddrStorage;
         char host[HOST_NAME_MAX + 1];
         int rv = getnameinfo(sockaddr, sizeof(*sockaddr), host, sizeof(host), nullptr, 0, 0);
         CHECK(rv == 0) << ", could not get the name of the sender, error code: " << rv
                        << ", error message: " << gai_strerror(rv);
         return std::string(host);
     }
+
+    std::string NetworkUtils::getServiceNameFromSocket(sockaddr_storage *sockaddrStorage) {
+        struct sockaddr *sockaddr = (struct sockaddr *) sockaddrStorage;
+        char port[HOST_NAME_MAX + 1];
+        int rv = getnameinfo(sockaddr, sizeof(*sockaddr), nullptr, 0, port, sizeof(port), 0);
+        CHECK(rv == 0) << ", could not get the port of the sender, error code: " << rv
+                       << ", error message: " << gai_strerror(rv);
+        return std::string(port);
+    }
+
+    Message::Message(const char *buffer, size_t n, std::string sender) : buffer(buffer),
+                                                                         n(n),
+                                                                         sender(std::move(sender)) {}
 
     UDPSender::UDPSender(std::string serverHost, int serverPort) : serverHost(std::move(serverHost)),
                                                                    serverPort(serverPort) {
@@ -94,10 +109,6 @@ namespace lab1 {
                         << ":" << serverPort;
     }
 
-    Message::Message(const char *buffer, size_t n, std::string sender) : buffer(buffer),
-                                                                         n(n),
-                                                                         sender(std::move(sender)) {}
-
     UDPReceiver::UDPReceiver(int portToListen) : portToListen(std::to_string(portToListen)) {
         VLOG(1) << "creating UDPReceiver for port: " << this->portToListen;
         initSocket();
@@ -153,7 +164,7 @@ namespace lab1 {
             LOG(ERROR) << errorMessage;
             throw std::runtime_error(errorMessage);
         } else {
-            std::string receivedFrom = NetworkUtils::getHostnameFromSocket((struct sockaddr *) &their_addr);
+            std::string receivedFrom = NetworkUtils::getHostnameFromSocket(&their_addr);
             VLOG(1) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
             return Message(buffer, numbytes, receivedFrom);
         }
@@ -164,5 +175,139 @@ namespace lab1 {
         int rv = ::close(recvFD);
         LOG_IF(ERROR, rv != 0) << ", error: " << errno
                                << ", while closing UDPReceiver on port: " << portToListen;
+    }
+
+    int bindSocketToFd(const std::string &hostname, const int port, struct addrinfo hints,
+                       struct addrinfo **serverInfoList, struct addrinfo **serverAddrInfo) {
+        VLOG(1) << "inside bindSocketToFd hostname: " << hostname << ":" << port;
+
+        if (int rv = ::getaddrinfo(hostname.c_str(), std::to_string(port).c_str(), &hints, serverInfoList);
+                rv != 0) {
+            throw std::runtime_error("cannot find host: " + hostname + ", port: " + std::to_string(port) +
+                                     ", getaddrinfo failed: " + std::string(::gai_strerror(rv)));
+        }
+
+        int sockFd;
+        // loop through all the results and make a socket
+        struct addrinfo *p;
+        for (p = *serverInfoList; p != nullptr; p = p->ai_next) {
+            if ((sockFd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+                LOG(ERROR) << "error in creating sender socket";
+                continue;
+            }
+            *serverAddrInfo = p;
+            LOG(INFO) << "sender socket created for hostname: " << hostname << ", port:" << port;
+            break;
+        }
+
+        CHECK(*serverAddrInfo != nullptr) << ", failed to create sender socket for host: "
+                                          << hostname << ":" << port;
+        return sockFd;
+    }
+
+    TcpServer::TcpServer(const int listeningPort) : listeningPort(listeningPort) {
+        LOG(INFO) << "creating tcp server on port: " << listeningPort;
+        initSocket();
+    }
+
+    void TcpServer::initSocket() {
+        VLOG(1) << "inside initSocket() of TcpServer on port: " << listeningPort;
+        struct addrinfo hints, *serverInfoList, *serverAddrInfo;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_PASSIVE;
+        sockFd = bindSocketToFd("0.0.0.0", listeningPort, hints, &serverInfoList,
+                                &serverAddrInfo);
+        int yes = 1;
+        VLOG(1) << "setting socket opt";
+        CHECK(::setsockopt(sockFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) != -1)
+                        << ", tcp server: setsockopt error for port" << listeningPort;
+        VLOG(1) << "binding port";
+        CHECK(::bind(sockFd, serverAddrInfo->ai_addr, serverAddrInfo->ai_addrlen) != -1)
+                        << ", tcp server: binding error for port" << listeningPort;
+        CHECK(serverAddrInfo != nullptr)
+                        << ", tcp server failed to bind for port" << listeningPort;
+        ::freeaddrinfo(serverInfoList);
+        VLOG(1) << "starting listening on port: " << listeningPort;
+        CHECK(::listen(sockFd, TCP_BACKLOG_QUEUE_SIZE) != -1)
+                        << ", tcp server failed to listen for port" << listeningPort;
+    }
+
+    TcpClient TcpServer::accept() {
+        LOG(INFO) << "waiting for connections on port: " << listeningPort;
+        struct sockaddr_storage clientAddr;
+        socklen_t sin_size = sizeof(clientAddr);
+        int clientFd = ::accept(sockFd, (struct sockaddr *) &clientAddr, &sin_size);
+        const std::string clientHostname = NetworkUtils::getHostnameFromSocket(&clientAddr);
+        const int clientPort = std::stoi(NetworkUtils::getServiceNameFromSocket(&clientAddr));
+        return TcpClient(clientHostname, clientPort, clientFd);
+    }
+
+    void TcpServer::close() {
+        LOG(INFO) << "closing tcp server on port: " << listeningPort;
+        ::close(sockFd);
+    }
+
+
+    TcpClient::TcpClient(std::string hostname, const int port, const int fd) : hostname(std::move(hostname)),
+                                                                               port(port),
+                                                                               sockFd(fd) {
+        LOG(INFO) << "tcp client created for host:" << hostname << ":" << port;
+    }
+
+    TcpClient::TcpClient(std::string hostname, const int port) : hostname(std::move(hostname)), port(port) {
+        VLOG(1) << "creating tcp client for host:" << hostname << ":" << port;
+        struct addrinfo hints, *serverInfoList, *serverAddrInfo;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        sockFd = bindSocketToFd(hostname, port, hints, &serverInfoList, &serverAddrInfo);
+        CHECK(serverAddrInfo != nullptr)
+                        << ", tcp client failed to connect to host: " << hostname << ":" << port;
+        CHECK(::connect(sockFd, serverAddrInfo->ai_addr, serverAddrInfo->ai_addrlen) != -1)
+                        << ", tcp client failed to connect to host: " << hostname << ":" << port;
+        ::freeaddrinfo(serverInfoList);
+        LOG(INFO) << "tcp client created for host:" << hostname << ":" << port;
+    }
+
+    const std::string &TcpClient::getHostname() const {
+        return hostname;
+    }
+
+    int TcpClient::getPort() const {
+        return port;
+    }
+
+    void TcpClient::send(const char *buff, size_t size) {
+        VLOG(1) << "inside send() of tcp client for host: " << hostname << ":" << port;
+        if (ssize_t numbytes = ::send(sockFd, buff, size, 0);
+                numbytes == -1) {
+            LOG(ERROR) << "error occurred while sending, host:" << hostname << ":" << port
+                       << ", buffer size: " << size << ", errno: " << errno;
+        } else {
+            VLOG(1) << "tcp client send to host: " << hostname << ":" << port << ", bytes: " << numbytes
+                    << ", buffer size: " << size;
+        }
+    }
+
+    Message TcpClient::receive() {
+        VLOG(1) << "inside receive() of tcp client for host: " << hostname << ":" << port;
+        char buffer[MAX_TCP_BUFFER_SIZE];
+        if (size_t numBytes = ::recv(sockFd, buffer, MAX_TCP_BUFFER_SIZE, 0);
+                numBytes == -1) {
+            std::string errorMessage("error(" + std::to_string(errno) + ") occurred while receiving data from host: " +
+                                     hostname + ":" + std::to_string(port));
+            LOG(ERROR) << errorMessage;
+            throw std::runtime_error(errorMessage);
+        } else {
+            VLOG(1) << "received:" << numBytes << " bytes, from host: " << hostname << ":" << port;
+            return Message(buffer, numBytes, hostname);
+        }
+    }
+
+    void TcpClient::close() {
+        LOG(INFO) << "closing tcp client for host: " << hostname << ":" << port;
+        ::close(sockFd);
     }
 }

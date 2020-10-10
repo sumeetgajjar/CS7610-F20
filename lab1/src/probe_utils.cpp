@@ -22,8 +22,8 @@ namespace lab1 {
         LOG(INFO) << "starting sending alive messages to peer";
         while (!stopAliveMessageLoop) {
             {
-                std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
                 LOG(INFO) << "sending alive messages to " << aliveMessageReceivers.size() << " receivers";
+                std::lock_guard<std::mutex> lockGuard(aliveMessageMutex);
                 for (auto &hostname : aliveMessageReceivers) {
                     auto udpSender = getUDPSender(hostname);
                     if (udpSender != nullptr) {
@@ -100,7 +100,7 @@ namespace lab1 {
 
     void ProbeReceiver::startListeningForMessages() {
         LOG(INFO) << "started listening for messages";
-        while (!validSenders.empty() || ProbeSender::getAliveMessageReceiverListSize() != 0) {
+        do {
             LOG(INFO) << "waiting for probe messages";
             auto message = udpReceiver.receive();
             auto messageString = std::string(message.buffer, message.n);
@@ -112,6 +112,8 @@ namespace lab1 {
             if (messageString.rfind(ProbeSender::aliveMessage, 0) == 0) {
                 LOG(INFO) << "received alive message from hostname: " << sender;
                 ProbeSender::sendingAckMessages(sender);
+                std::this_thread::sleep_for(std::chrono::seconds{1});
+                ProbeSender::sendingAckMessages(sender);
                 validSenders.erase(sender);
                 LOG(INFO) << "removed sender: " << sender << ", from validSenders, validSendersSize: "
                           << validSenders.size();
@@ -121,7 +123,7 @@ namespace lab1 {
             } else {
                 LOG(ERROR) << "unknown message from: " << sender << ", message: " << messageString;
             }
-        }
+        } while (!validSenders.empty() || ProbeSender::getAliveMessageReceiverListSize() != 0);
         udpReceiver.close();
         LOG(INFO) << "stopped listening for messages, as received alive message from all peers";
     }
@@ -141,6 +143,8 @@ namespace lab1 {
             conditionVariable.notify_one();
             probeReceiver.startListeningForMessages();
         });
+
+        std::this_thread::sleep_for(std::chrono::seconds{2});
 
         std::thread alive([&]() {
             for (const auto &peerContainerHostname : peerHostnames) {
