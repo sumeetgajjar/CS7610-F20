@@ -39,6 +39,12 @@ namespace lab1 {
         return o;
     }
 
+    std::ostream &operator<<(std::ostream &o, const MarkerMessage &markerMsg) {
+        o << "type: " << markerMsg.type
+          << ", sender: " << markerMsg.sender;
+        return o;
+    }
+
     std::ostream &operator<<(std::ostream &o, const MessageType &messageType) {
         o << [&]() {
             switch (messageType) {
@@ -50,6 +56,10 @@ namespace lab1 {
                     return "SeqMsg";
                 case SeqAck:
                     return "SeqAckMsg";
+                case Marker:
+                    return "MarkerMsg";
+                default:
+                    throw std::runtime_error("unknown message type: " + std::to_string(messageType));
             }
         }();
         return o;

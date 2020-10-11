@@ -2,109 +2,17 @@
 // Created by sumeet on 10/2/20.
 //
 
-#include <glog/logging.h>
-
 #include <utility>
 #include <cmath>
+
+#include <glog/logging.h>
+
 #include "multicast.h"
+#include "serde.h"
 #include "utils.h"
 
 namespace lab1 {
 
-    MessageType getMessageType(const Message &message) {
-        CHECK(message.n > 0) << ", found a msg of size 0 bytes, sender: " << message.sender;
-        auto *ptr = reinterpret_cast<const uint32_t *>(message.buffer);
-        return static_cast<MessageType>(ntohl(*ptr));
-    }
-
-    DataMessage deserializeDataMsg(const Message &message) {
-        VLOG(1) << "deserializing data msg from: " << message.sender;
-        CHECK(message.n == sizeof(DataMessage)) << ", buffer size does not match DataMessage size";
-        auto *ptr = reinterpret_cast<const DataMessage *>(message.buffer);
-        DataMessage msg;
-        msg.type = ntohl(ptr->type);
-        msg.sender = ntohl(ptr->sender);
-        msg.msg_id = ntohl(ptr->msg_id);
-        msg.data = ntohl(ptr->data);
-        return msg;
-    }
-
-    AckMessage deserializeAckMessage(const Message &message) {
-        VLOG(1) << "deserializing ack msg from: " << message.sender;
-        CHECK(message.n == sizeof(AckMessage)) << ", buffer size does not match AckMessage size";
-        auto *ptr = reinterpret_cast<const AckMessage *>(message.buffer);
-        AckMessage msg;
-        msg.type = ntohl(ptr->type);
-        msg.sender = ntohl(ptr->sender);
-        msg.msg_id = ntohl(ptr->msg_id);
-        msg.proposed_seq = ntohl(ptr->proposed_seq);
-        msg.proposer = ntohl(ptr->proposer);
-        return msg;
-    }
-
-    SeqMessage deserializeSeqMessage(const Message &message) {
-        VLOG(1) << "deserializing seq msg from: " << message.sender;
-        CHECK(message.n == sizeof(SeqMessage)) << ", buffer size does not match SeqMessage size";
-        auto *ptr = reinterpret_cast<const SeqMessage *>(message.buffer);
-        SeqMessage msg;
-        msg.type = ntohl(ptr->type);
-        msg.sender = ntohl(ptr->sender);
-        msg.msg_id = ntohl(ptr->msg_id);
-        msg.final_seq = ntohl(ptr->final_seq);
-        msg.final_seq_proposer = ntohl(ptr->final_seq_proposer);
-        return msg;
-    }
-
-    SeqAckMessage deserializeSeqAckMessage(const Message &message) {
-        VLOG(1) << "deserializing seq ack msg from: " << message.sender;
-        CHECK(message.n == sizeof(SeqAckMessage)) << ", buffer size does not match SeqAckMessage size";
-        auto *ptr = reinterpret_cast<const SeqAckMessage *>(message.buffer);
-        SeqAckMessage msg;
-        msg.type = ntohl(ptr->type);
-        msg.sender = ntohl(ptr->sender);
-        msg.msg_id = ntohl(ptr->msg_id);
-        msg.ack_sender = ntohl(ptr->ack_sender);
-        return msg;
-    }
-
-
-    void serializeDataMessage(DataMessage dataMsg, char *buffer) {
-        VLOG(1) << "serializing data msg, dataMessage: " << dataMsg;
-        auto *msg = reinterpret_cast<DataMessage *>(buffer);
-        msg->data = htonl(dataMsg.data);
-        msg->sender = htonl(dataMsg.sender);
-        msg->msg_id = htonl(dataMsg.msg_id);
-        msg->type = htonl(dataMsg.type);
-    }
-
-    void serializeAckMessage(AckMessage ackMsg, char *buffer) {
-        VLOG(1) << "serializing ack msg, AckMessage: " << ackMsg;
-        auto *msg = reinterpret_cast<AckMessage *>(buffer);
-        msg->type = htonl(ackMsg.type);
-        msg->sender = htonl(ackMsg.sender);
-        msg->msg_id = htonl(ackMsg.msg_id);
-        msg->proposed_seq = htonl(ackMsg.proposed_seq);
-        msg->proposer = htonl(ackMsg.proposer);
-    }
-
-    void serializeSeqMessage(SeqMessage seqMsg, char *buffer) {
-        VLOG(1) << "serializing ack msg, SeqMessage: " << seqMsg;
-        auto *msg = reinterpret_cast<SeqMessage *>(buffer);
-        msg->type = htonl(seqMsg.type);
-        msg->sender = htonl(seqMsg.sender);
-        msg->msg_id = htonl(seqMsg.msg_id);
-        msg->final_seq = htonl(seqMsg.final_seq);
-        msg->final_seq_proposer = htonl(seqMsg.final_seq_proposer);
-    }
-
-    void serializeSeqAckMessage(SeqAckMessage seqAckMsg, char *buffer) {
-        VLOG(1) << "serializing seq ack msg, seqAckMessage: " << seqAckMsg;
-        auto *msg = reinterpret_cast<SeqAckMessage *>(buffer);
-        msg->type = htonl(seqAckMsg.type);
-        msg->sender = htonl(seqAckMsg.sender);
-        msg->msg_id = htonl(seqAckMsg.msg_id);
-        msg->ack_sender = htonl(seqAckMsg.ack_sender);
-    }
 
     template<typename T>
     ContinuousMsgSender<T>::ContinuousMsgSender(int maxSendingIntervalMillis,
@@ -219,8 +127,8 @@ namespace lab1 {
             dropRate(dropRate),
             messageDelay(messageDelayMillis),
             holdBackQueue(cb),
-            dataMsgSender(4000, recipients, serializeDataMessage),
-            seqMsgSender(4000, recipients, serializeSeqMessage),
+            dataMsgSender(4000, recipients, Serde::serializeDataMessage),
+            seqMsgSender(4000, recipients, Serde::serializeSeqMessage),
             udpReceiver(MULTICAST_PORT) {
 
         msgId = 0;
@@ -317,7 +225,7 @@ namespace lab1 {
         while (true) {
             LOG(INFO) << "waiting for multicast messages";
             auto message = udpReceiver.receive();
-            auto messageType = getMessageType(message);
+            auto messageType = Serde::getMessageType(message);
             LOG(INFO) << "received " << messageType << " from " << message.sender;
             if (dropMessage(message, messageType)) {
                 continue;
@@ -325,19 +233,19 @@ namespace lab1 {
 
             switch (messageType) {
                 case MessageType::Data:
-                    processDataMsg(deserializeDataMsg(message));
+                    processDataMsg(Serde::deserializeDataMsg(message));
                     break;
                 case MessageType::Ack:
-                    processAckMsg(deserializeAckMessage(message));
+                    processAckMsg(Serde::deserializeAckMessage(message));
                     break;
                 case MessageType::Seq:
-                    processSeqMsg(deserializeSeqMessage(message));
+                    processSeqMsg(Serde::deserializeSeqMessage(message));
                     break;
                 case MessageType::SeqAck:
-                    processSeqAckMsg(deserializeSeqAckMessage(message));
+                    processSeqAckMsg(Serde::deserializeSeqAckMessage(message));
                     break;
                 default:
-                    LOG(FATAL) << "unknown msg type: " << messageType;
+                    LOG(ERROR) << "unknown msg type: " << messageType;
             }
         }
         LOG(INFO) << "stopping listening for multicast messages";
@@ -356,7 +264,7 @@ namespace lab1 {
         }
 
         char buffer[sizeof(AckMessage)];
-        serializeAckMessage(ackMsg, reinterpret_cast<char *>(&buffer));
+        Serde::serializeAckMessage(ackMsg, reinterpret_cast<char *>(&buffer));
         auto sender = recipientIdMap.at(dataMsg.sender);
         delayMessage(MessageType::Ack);
         udpSenderMap.at(sender)->send(buffer, sizeof(AckMessage));
@@ -391,7 +299,7 @@ namespace lab1 {
         }
         auto seqAckMsg = createSeqAckMessage(seqMsg);
         char buffer[sizeof(SeqAckMessage)];
-        serializeSeqAckMessage(seqAckMsg, reinterpret_cast<char *>(&buffer));
+        Serde::serializeSeqAckMessage(seqAckMsg, reinterpret_cast<char *>(&buffer));
         auto sender = recipientIdMap.at(seqMsg.sender);
         delayMessage(MessageType::SeqAck);
         udpSenderMap.at(sender)->send(buffer, sizeof(SeqAckMessage));

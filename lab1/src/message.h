@@ -14,7 +14,8 @@ namespace lab1 {
         Data = 1,
         Ack = 2,
         Seq = 3,
-        SeqAck = 4
+        SeqAck = 4,
+        Marker = 5
     };
 
     typedef struct {
@@ -47,6 +48,11 @@ namespace lab1 {
         uint32_t ack_sender; // id of the process sending acknowledgement
     } SeqAckMessage;
 
+    typedef struct {
+        uint32_t type; // must be equal to 5
+        uint32_t sender; // the send of the marker message
+    } MarkerMessage;
+
     std::ostream &operator<<(std::ostream &o, const DataMessage &dataMsg);
 
     std::ostream &operator<<(std::ostream &o, const AckMessage &ackMsg);
@@ -54,6 +60,8 @@ namespace lab1 {
     std::ostream &operator<<(std::ostream &o, const SeqMessage &seqMsg);
 
     std::ostream &operator<<(std::ostream &o, const SeqAckMessage &seqAckMsg);
+
+    std::ostream &operator<<(std::ostream &o, const MarkerMessage &markerMsg);
 
     std::ostream &operator<<(std::ostream &o, const MessageType &messageType);
 }

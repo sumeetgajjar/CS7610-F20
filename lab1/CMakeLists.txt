@@ -22,6 +22,10 @@ add_executable(lab1
         src/probe_utils.h
         src/probe_utils.cpp
         src/multicast.h
-        src/multicast.cpp)
+        src/multicast.cpp
+        src/snapshot.h
+        src/snapshot.cpp
+        src/serde.h
+        src/serde.cpp)
 
 target_link_libraries(lab1 glog::glog gflags::gflags)
