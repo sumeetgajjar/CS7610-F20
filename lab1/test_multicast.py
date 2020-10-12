@@ -18,7 +18,7 @@ def configure_logging(level=logging.INFO):
     logger.addHandler(console_handler)
 
 
-configure_logging()
+configure_logging(logging.DEBUG if os.getenv("VERBOSE", "0") == "1" else logging.INFO)
 
 NETWORK_BRIDGE = "cs7610-bridge"
 NETWORK_BRIDGE_EXISTS_CMD = f'docker network ls --quiet --filter name={NETWORK_BRIDGE}'
