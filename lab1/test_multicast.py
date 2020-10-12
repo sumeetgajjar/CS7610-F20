@@ -206,7 +206,7 @@ class MulticastSuite(BaseSuite):
         logging.info("grepping message delivery in process logs")
         self.__assert_ordering_is_same_for_all_processes(expected_msg_count)
 
-    def test_single_sender(self):
+    def test_one_sender(self):
         self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=4)
 
     def test_two_senders(self):
@@ -227,9 +227,19 @@ class MulticastSuite(BaseSuite):
     def test_drop_delay_messages(self):
         self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.25, delay=2000)
 
-    def test_snapshot(self):
+    def test_snapshot_with_one_sender(self):
         self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=8,
                             snapshot_initiator=self.HOSTS[0],
+                            initiate_snapshot_count=3)
+
+    def test_snapshot_with_two_senders(self):
+        self.__test_wrapper(senders=self.HOSTS[0:2], msg_count=8,
+                            snapshot_initiator=self.HOSTS[1],
+                            initiate_snapshot_count=3)
+
+    def test_snapshot_with_all_senders(self):
+        self.__test_wrapper(senders=self.HOSTS, msg_count=8,
+                            snapshot_initiator=self.HOSTS[-1],
                             initiate_snapshot_count=3)
 
 
