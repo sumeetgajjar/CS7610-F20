@@ -20,9 +20,8 @@
 namespace lab1 {
 
     typedef std::unordered_map<std::string, std::shared_ptr<UDPSender>> UdpSenderMap;
-    //Map of messageId -> (senderId -> proposedSequenceId)
     typedef std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>> ProposedSeqIdMap;
-    typedef std::function<void(const DataMessage)> MsgDeliveryCb;
+    typedef std::function<void(const DataMessage &)> MsgDeliveryCb;
 
     template<typename T>
     class ContinuousMsgSender {
@@ -60,6 +59,8 @@ namespace lab1 {
         void queueMsg(T message);
 
         bool removeRecipient(uint32_t messageId, const std::string &recipient);
+
+        std::string getCurrentState();
     };
 
     class MsgIdentifier {
@@ -104,6 +105,7 @@ namespace lab1 {
         const MsgDeliveryCb cb;
         // set of pair<msgId, senderId>
         std::unordered_set<MsgIdentifier, MsgIdentifierHash> pendingMsgSet;
+        std::mutex dequeMutex;
         std::deque<PendingMsg> deque;
 
     public:
@@ -117,16 +119,18 @@ namespace lab1 {
         bool addToQueue(DataMessage dataMsg, uint32_t proposedSeq, uint32_t proposer);
 
         bool markDeliverable(SeqMessage seqMsg);
+
+        std::string getCurrentState();
     };
 
     class MulticastService {
 
         const uint32_t senderId;
         const std::vector<std::string> recipients;
+        const std::unordered_map<int, std::string> recipientIdMap;
         const std::chrono::milliseconds messageDelay;
-        const double dropRate;
 
-        std::unordered_map<int, std::string> recipientIdMap;
+        const double dropRate;
 
         uint32_t msgId;
         uint32_t latestSeqId;
@@ -135,10 +139,10 @@ namespace lab1 {
 
         ContinuousMsgSender<DataMessage> dataMsgSender;
         ContinuousMsgSender<SeqMessage> seqMsgSender;
-        // map of <pair<msgId, senderId>, AckMessage>
         std::unordered_map<MsgIdentifier, AckMessage, MsgIdentifierHash> ackMessageCache;
         UdpSenderMap udpSenderMap;
         UDPReceiver udpReceiver;
+        const std::function<void(const Message &)> incomingMessageCb;
 
         DataMessage createDataMessage(uint32_t data);
 
@@ -164,13 +168,19 @@ namespace lab1 {
         [[noreturn]] void startListeningForMessages();
 
     public:
-        MulticastService(uint32_t senderId, const std::vector<std::string> &recipients, const MsgDeliveryCb &cb,
+        MulticastService(uint32_t senderId,
+                         const std::vector<std::string> &recipients,
+                         const std::unordered_map<int, std::string> &recipientIdMap,
+                         const MsgDeliveryCb &cb,
+                         std::function<void(const Message &)> incomingMessageCb,
                          double dropRate,
                          int messageDelayMillis);
 
         void multicast(uint32_t data);
 
         void start();
+
+        std::string getCurrentState();
     };
 
 }

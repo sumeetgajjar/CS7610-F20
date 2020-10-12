@@ -19,3 +19,5 @@ On reaching 4000ms it resets back to 200ms.
     - when a data msg is delayed
 
 - the containers do not exit on their own, but are stopped in the tearDown phase of the test
+
+- the local state of the sender will only contain data for continousu sender

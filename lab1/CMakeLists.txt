@@ -19,8 +19,6 @@ add_executable(lab1
         src/utils.cpp
         src/network_utils.h
         src/network_utils.cpp
-        src/probe_utils.h
-        src/probe_utils.cpp
         src/multicast.h
         src/multicast.cpp
         src/snapshot.h

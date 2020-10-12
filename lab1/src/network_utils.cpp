@@ -2,6 +2,7 @@
 #include <climits>
 #include <glog/logging.h>
 #include <utility>
+#include <thread>
 
 #include "network_utils.h"
 
@@ -34,14 +35,32 @@ namespace lab1 {
         return std::string(port);
     }
 
+    std::string NetworkUtils::parseHostnameFromSender(const std::string &sender) {
+        // sender is of form <hostname>.<network-name>. e.g: "sumeet-g-alpha.cs7610-bridge"
+        // However the hostfile just contains "sumeet-g-alpha", hence need to split the sender string
+        return sender.substr(0, sender.find('.'));
+    }
+
     Message::Message(const char *buffer, size_t n, std::string sender) : buffer(buffer),
                                                                          n(n),
                                                                          sender(std::move(sender)) {}
 
+    std::string Message::getParsedSender() const {
+        return NetworkUtils::parseHostnameFromSender(sender);
+    }
+
     UDPSender::UDPSender(std::string serverHost, int serverPort) : serverHost(std::move(serverHost)),
                                                                    serverPort(serverPort) {
         VLOG(1) << "creating UDPSender for hostname: " << this->serverHost << ":" << this->serverPort;
-        initSocket();
+        while (true) {
+            try {
+                initSocket();
+                break;
+            } catch (std::runtime_error &e) {
+                LOG(ERROR) << "UDPSender creation error: " << e.what();
+                std::this_thread::sleep_for(std::chrono::seconds{2});
+            }
+        }
     }
 
     void UDPSender::initSocket() {
@@ -148,16 +167,14 @@ namespace lab1 {
         freeaddrinfo(serverInfoList);
     }
 
-    Message UDPReceiver::receive() {
+    std::pair<int, std::string> UDPReceiver::receive(char *buffer, size_t n) {
         VLOG(1) << "inside receive() of UDPReceiver, port: " << portToListen;
         struct sockaddr_storage their_addr;
         socklen_t addr_len;
         addr_len = sizeof(their_addr);
 
         VLOG(1) << "waiting for message";
-        char buffer[MAX_UDP_BUFFER_SIZE];
-        memset(&buffer, 0, MAX_UDP_BUFFER_SIZE);
-        if (ssize_t numbytes = recvfrom(recvFD, buffer, MAX_UDP_BUFFER_SIZE - 1, 0, (struct sockaddr *) &their_addr,
+        if (ssize_t numbytes = recvfrom(recvFD, buffer, n, 0, (struct sockaddr *) &their_addr,
                                         &addr_len);
                 numbytes == -1) {
             std::string errorMessage("error(" + std::to_string(errno) + ") occurred while receiving data");
@@ -166,7 +183,7 @@ namespace lab1 {
         } else {
             std::string receivedFrom = NetworkUtils::getHostnameFromSocket(&their_addr);
             VLOG(1) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
-            return Message(buffer, numbytes, receivedFrom);
+            return std::make_pair(numbytes, receivedFrom);
         }
     }
 
@@ -181,7 +198,8 @@ namespace lab1 {
                        struct addrinfo **serverInfoList, struct addrinfo **serverAddrInfo) {
         VLOG(1) << "inside bindSocketToFd hostname: " << hostname << ":" << port;
 
-        if (int rv = ::getaddrinfo(hostname.c_str(), std::to_string(port).c_str(), &hints, serverInfoList);
+        if (int rv = ::getaddrinfo(hostname.empty() ? nullptr : hostname.c_str(),
+                                   std::to_string(port).c_str(), &hints, serverInfoList);
                 rv != 0) {
             throw std::runtime_error("cannot find host: " + hostname + ", port: " + std::to_string(port) +
                                      ", getaddrinfo failed: " + std::string(::gai_strerror(rv)));
@@ -217,8 +235,7 @@ namespace lab1 {
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_PASSIVE;
-        sockFd = bindSocketToFd("0.0.0.0", listeningPort, hints, &serverInfoList,
-                                &serverAddrInfo);
+        sockFd = bindSocketToFd("", listeningPort, hints, &serverInfoList, &serverAddrInfo);
         int yes = 1;
         VLOG(1) << "setting socket opt";
         CHECK(::setsockopt(sockFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) != -1)
@@ -250,14 +267,16 @@ namespace lab1 {
     }
 
 
-    TcpClient::TcpClient(std::string hostname, const int port, const int fd) : hostname(std::move(hostname)),
-                                                                               port(port),
-                                                                               sockFd(fd) {
+    TcpClient::TcpClient(std::string hostname_, const int port, const int fd) : hostname(std::move(hostname_)),
+                                                                                port(port),
+                                                                                sockFd(fd) {
         LOG(INFO) << "tcp client created for host:" << hostname << ":" << port;
+        LOG_IF(FATAL, hostname.empty()) << "hostname cannot be empty";
     }
 
-    TcpClient::TcpClient(std::string hostname, const int port) : hostname(std::move(hostname)), port(port) {
-        VLOG(1) << "creating tcp client for host:" << hostname << ":" << port;
+    TcpClient::TcpClient(std::string hostname_, const int port) : hostname(std::move(hostname_)), port(port) {
+        VLOG(1) << "creating tcp client for host: " << hostname << ":" << port;
+        LOG_IF(FATAL, hostname.empty()) << "hostname cannot be empty";
         struct addrinfo hints, *serverInfoList, *serverAddrInfo;
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC;
@@ -265,8 +284,11 @@ namespace lab1 {
         sockFd = bindSocketToFd(hostname, port, hints, &serverInfoList, &serverAddrInfo);
         CHECK(serverAddrInfo != nullptr)
                         << ", tcp client failed to connect to host: " << hostname << ":" << port;
-        CHECK(::connect(sockFd, serverAddrInfo->ai_addr, serverAddrInfo->ai_addrlen) != -1)
-                        << ", tcp client failed to connect to host: " << hostname << ":" << port;
+        while (::connect(sockFd, serverAddrInfo->ai_addr, serverAddrInfo->ai_addrlen) == -1) {
+            LOG(ERROR) << "tcp client failed to connect to host: " << hostname << ":" << port;
+            std::this_thread::sleep_for(std::chrono::milliseconds{1000});
+            LOG(INFO) << "tcp client retrying to connect to host: " << hostname << ":" << port;
+        }
         ::freeaddrinfo(serverInfoList);
         LOG(INFO) << "tcp client created for host:" << hostname << ":" << port;
     }

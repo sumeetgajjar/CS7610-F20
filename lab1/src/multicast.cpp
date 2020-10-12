@@ -118,27 +118,50 @@ namespace lab1 {
         return interval;
     }
 
-    MulticastService::MulticastService(uint32_t senderId, const std::vector<std::string> &recipients,
+    template<typename T>
+    std::string ContinuousMsgSender<T>::getCurrentState() {
+        std::stringstream ss;
+        ss << "==================== start of the " << typeid(T).name() << " ContinuousMsgSender ====================\n";
+        ss << "======================= start of the sending queue =======================\n";
+        {
+            std::lock_guard<std::mutex> lockGuard(msgListMutex);
+            for (const MsgHolder &msgHolder : msgList) {
+                ss << "Data: " << msgHolder.orgMsg << "\n";
+                ss << "======================= start of the recipients =======================\n";
+                for (const auto &recipient : msgHolder.recipients) {
+                    ss << recipient << "\n";
+                }
+                ss << "======================= end of the recipients =======================\n";
+            }
+        }
+        ss << "======================= end of the sending queue =======================\n";
+        ss << "==================== end of the " << typeid(T).name() << " ContinuousMsgSender ====================\n";
+        return ss.str();
+    }
+
+    MulticastService::MulticastService(uint32_t senderId,
+                                       const std::vector<std::string> &recipients,
+                                       const std::unordered_map<int, std::string> &recipientIdMap,
                                        const MsgDeliveryCb &cb,
+                                       std::function<void(const Message &)> incomingMessageCb,
                                        double dropRate,
                                        int messageDelayMillis) :
             senderId(senderId),
             recipients(recipients),
+            recipientIdMap(recipientIdMap),
             dropRate(dropRate),
             messageDelay(messageDelayMillis),
             holdBackQueue(cb),
             dataMsgSender(4000, recipients, Serde::serializeDataMessage),
             seqMsgSender(4000, recipients, Serde::serializeSeqMessage),
-            udpReceiver(MULTICAST_PORT) {
+            udpReceiver(MULTICAST_PORT),
+            incomingMessageCb(std::move(incomingMessageCb)) {
 
         msgId = 0;
         latestSeqId = 0;
         LOG(INFO) << "multicast recipientSize: " << this->recipients.size();
         for (const auto &recipient : this->recipients) {
             udpSenderMap[recipient] = std::make_shared<UDPSender>(UDPSender(recipient, MULTICAST_PORT));
-
-            const auto recipientId = Utils::getProcessIdentifier(recipients, recipient);
-            recipientIdMap[recipientId] = recipient;
         }
     }
 
@@ -224,9 +247,13 @@ namespace lab1 {
         LOG(INFO) << "starting listening for multicast messages";
         while (true) {
             LOG(INFO) << "waiting for multicast messages";
-            auto message = udpReceiver.receive();
+            char buffer[MAX_UDP_BUFFER_SIZE];
+            auto pair = udpReceiver.receive(buffer, MAX_UDP_BUFFER_SIZE);
+            Message message(buffer, pair.first, pair.second);
+
             auto messageType = Serde::getMessageType(message);
             LOG(INFO) << "received " << messageType << " from " << message.sender;
+            incomingMessageCb(message);
             if (dropMessage(message, messageType)) {
                 continue;
             }
@@ -245,7 +272,7 @@ namespace lab1 {
                     processSeqAckMsg(Serde::deserializeSeqAckMessage(message));
                     break;
                 default:
-                    LOG(ERROR) << "unknown msg type: " << messageType;
+                    LOG(FATAL) << "unknown msg type: " << messageType;
             }
         }
         LOG(INFO) << "stopping listening for multicast messages";
@@ -342,6 +369,34 @@ namespace lab1 {
         msgReceiverThread.join();
     }
 
+    std::string MulticastService::getCurrentState() {
+        std::stringstream ss;
+        ss << "senderId: " << senderId << "\n"
+           << "messageDelay: " << messageDelay.count() << "ms\n"
+           << "dropRate: " << dropRate << "\n"
+           << "currentMsgId: " << msgId << "\n"
+           << "currSeqId: " << latestSeqId << "\n";
+        for (const auto &pair1 : proposedSeqIdMap) {
+            ss << "=================== start of proposed Seq Id for MsdId: " << pair1.first << " ===================\n";
+            for (const auto &pair2 : pair1.second) {
+                ss << pair2.first << " proposes: " << pair2.second << "\n";
+            }
+            ss << "==================== End of proposed Seq Id for MsdId: " << pair1.first << " ====================\n";
+        }
+
+        ss << dataMsgSender.getCurrentState() << "\n"
+           << seqMsgSender.getCurrentState() << "\n"
+           << holdBackQueue.getCurrentState() << "\n";
+
+        ss << "============================== start of ack message cache ==============================\n";
+        for (const auto &pair : ackMessageCache) {
+            ss << pair.second << "\n";
+        }
+        ss << "============================== end of ack message cache ==============================\n";
+
+        return ss.str();
+    }
+
     PendingMsg::PendingMsg(const DataMessage &dataMsg, uint32_t proposedSeq, uint32_t proposer) :
             dataMsg(dataMsg),
             finalSeqId(proposedSeq),
@@ -368,7 +423,10 @@ namespace lab1 {
         MsgIdentifier msgIdentifier(dataMsg.msg_id, dataMsg.sender);
         if (pendingMsgSet.find(msgIdentifier) == pendingMsgSet.end()) {
             pendingMsgSet.insert(msgIdentifier);
-            deque.emplace_back(dataMsg, proposedSeq, proposer);
+            {
+                std::lock_guard<std::mutex> lockGuard(dequeMutex);
+                deque.emplace_back(dataMsg, proposedSeq, proposer);
+            }
             added = true;
             LOG(INFO) << "adding dataMsg to holdBackQueue: " << dataMsg << ", holdBackQueue size: " << deque.size();
         }
@@ -391,6 +449,7 @@ namespace lab1 {
                     break;
                 }
             }
+            std::lock_guard<std::mutex> lockGuard(dequeMutex);
             std::sort(deque.begin(), deque.end());
             LOG(INFO) << "\n" << deque;
             auto it = deque.begin();
@@ -408,6 +467,14 @@ namespace lab1 {
         LOG_IF(WARNING, !marked) << "tried marking seqMsg which no longer exists: " << seqMsg;
         return marked;
     }
+
+    std::string HoldBackQueue::getCurrentState() {
+        std::stringstream ss;
+        std::lock_guard<std::mutex> lockGuard(dequeMutex);
+        ss << deque;
+        return ss.str();
+    }
+
 
     MsgIdentifier::MsgIdentifier(uint32_t msgId, uint32_t sender) : msgId(msgId), sender(sender) {}
 

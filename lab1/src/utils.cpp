@@ -61,12 +61,6 @@ namespace lab1 {
         LOG(FATAL) << "cannot find process identifier for: " + hostname;
     }
 
-    std::string Utils::parseHostnameFromSender(const std::string &sender) {
-        // sender is of form <hostname>.<network-name>. e.g: "sumeet-g-alpha.cs7610-bridge"
-        // However the hostfile just contains "sumeet-g-alpha", hence need to split the sender string
-        return sender.substr(0, sender.find('.'));
-    }
-
     double Utils::getRandomNumber(double min, double max) {
         std::uniform_real_distribution<double> distribution(min, max);
         return distribution(randomEngine);

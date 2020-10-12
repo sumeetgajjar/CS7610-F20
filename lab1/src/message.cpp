@@ -48,15 +48,15 @@ namespace lab1 {
     std::ostream &operator<<(std::ostream &o, const MessageType &messageType) {
         o << [&]() {
             switch (messageType) {
-                case Data:
+                case MessageType::Data:
                     return "DataMsg";
-                case Ack:
+                case MessageType::Ack:
                     return "AckMsg";
-                case Seq:
+                case MessageType::Seq:
                     return "SeqMsg";
-                case SeqAck:
+                case MessageType::SeqAck:
                     return "SeqAckMsg";
-                case Marker:
+                case MessageType::Marker:
                     return "MarkerMsg";
                 default:
                     throw std::runtime_error("unknown message type: " + std::to_string(messageType));

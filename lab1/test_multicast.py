@@ -26,7 +26,7 @@ NETWORK_BRIDGE_CREATE_CMD = f'docker network create --driver bridge {NETWORK_BRI
 RUNNING_CONTAINERS_CMD = 'docker ps -a --quiet --filter name=sumeet-g*'
 STOP_CONTAINERS_CMD = 'docker stop {CONTAINERS}'
 REMOVE_CONTAINERS_CMD = 'docker rm {CONTAINERS}'
-START_CONTAINER_CMD = "docker run --rm --detach" \
+START_CONTAINER_CMD = "docker run --detach" \
                       " --name {HOST} --network {NETWORK_BRIDGE} --hostname {HOST}" \
                       " -v {LOG_DIR}:/var/log/lab1 --env GLOG_log_dir=/var/log/lab1" \
                       " sumeet-g-prj1 {VERBOSE} --hostfile /hostfile {ARGS}"
@@ -119,7 +119,7 @@ class BaseSuite(unittest.TestCase):
                 os.makedirs(host_log_dir, exist_ok=True)
 
     @classmethod
-    def stop_and_remove_running_containers(cls) -> None:
+    def stop_and_remove_running_containers(cls, remove_container=False) -> None:
         logging.info("stopping running containers")
         p_run = cls.run_shell(RUNNING_CONTAINERS_CMD)
         cls.assert_process_exit_status("running containers cmd", p_run)
@@ -128,7 +128,8 @@ class BaseSuite(unittest.TestCase):
             logging.info(f"found running containers: {running_containers}")
             p_stop = cls.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=" ".join(running_containers)))
             cls.assert_process_exit_status("stop containers cmd", p_stop)
-            p_remove = cls.run_shell(REMOVE_CONTAINERS_CMD.format(CONTAINERS=" ".join(running_containers)))
+            if remove_container:
+                p_remove = cls.run_shell(REMOVE_CONTAINERS_CMD.format(CONTAINERS=" ".join(running_containers)))
         else:
             logging.info("no running containers found")
 
@@ -140,7 +141,7 @@ class MulticastSuite(BaseSuite):
         return super().setUpClass()
 
     def setUp(self) -> None:
-        self.stop_and_remove_running_containers()
+        self.stop_and_remove_running_containers(remove_container=True)
 
     def tearDown(self) -> None:
         self.stop_and_remove_running_containers()
@@ -187,16 +188,18 @@ class MulticastSuite(BaseSuite):
                                  f"order of process {ix} does not match with that of process {0}")
 
     def __test_wrapper(self, senders: List[str], msg_count=0, drop_rate=0.0, delay=0,
+                       snapshot_initiator=None,
                        initiate_snapshot_count=0) -> None:
         logging.info(f"senders for the test: {senders}")
         logging.info(f"args: msgCount: {msg_count}, dropRate: {drop_rate}, delay: {delay}, "
                      f"initiateSnapshotCount: {initiate_snapshot_count}")
         for host in self.HOSTS:
+            host_initiate_snapshot_count = initiate_snapshot_count if host == snapshot_initiator else 0
             logging.info(f"starting container for host: {host}")
             p_run = self.run_shell(
                 START_CONTAINER_CMD.format(**self.__get_app_args(host, senders=senders, msg_count=msg_count,
                                                                  drop_rate=drop_rate, delay=delay,
-                                                                 initiate_snapshot_count=initiate_snapshot_count)))
+                                                                 initiate_snapshot_count=host_initiate_snapshot_count)))
             self.assert_process_exit_status(f"{host} container run cmd", p_run)
 
         expected_msg_count = len(senders) * msg_count
@@ -223,6 +226,11 @@ class MulticastSuite(BaseSuite):
 
     def test_drop_delay_messages(self):
         self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=2, drop_rate=0.25, delay=2000)
+
+    def test_snapshot(self):
+        self.__test_wrapper(senders=self.HOSTS[0:1], msg_count=8,
+                            snapshot_initiator=self.HOSTS[0],
+                            initiate_snapshot_count=3)
 
 
 if __name__ == '__main__':

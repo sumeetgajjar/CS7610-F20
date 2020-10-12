@@ -25,6 +25,8 @@ namespace lab1 {
         static std::string getHostnameFromSocket(sockaddr_storage *sockaddrStorage);
 
         static std::string getServiceNameFromSocket(sockaddr_storage *sockaddrStorage);
+
+        static std::string parseHostnameFromSender(const std::string &sender);
     };
 
     class Message {
@@ -32,9 +34,10 @@ namespace lab1 {
         const char *buffer;
         const size_t n;
         const std::string sender;
-
     public:
         Message(const char *buffer, size_t n, std::string sender);
+
+        std::string getParsedSender() const;
     };
 
     class UDPSender {
@@ -64,7 +67,7 @@ namespace lab1 {
     public:
         explicit UDPReceiver(int portToListen);
 
-        Message receive();
+        std::pair<int, std::string> receive(char *buffer, size_t n);
 
         void close();
     };
@@ -76,9 +79,9 @@ namespace lab1 {
         int sockFd;
 
     public:
-        TcpClient(std::string hostname, int port, int fd);
+        TcpClient(std::string hostname_, int port, int fd);
 
-        TcpClient(std::string hostname, int port);
+        TcpClient(std::string hostname_, int port);
 
         const std::string &getHostname() const;
 
