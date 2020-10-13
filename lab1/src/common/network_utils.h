@@ -104,7 +104,7 @@ namespace lab1 {
     public:
         TcpServer(int listeningPort);
 
-        TcpClient accept();
+        TcpClient accept() const;
 
         void close();
     };

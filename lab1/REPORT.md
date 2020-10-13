@@ -1,4 +1,9 @@
-- retry mechanism
+- ContinuousMsgSender
+- SeqAckMessage
+- HoldBackQueue
+    - when it is printed, what is printed
+- Snapshot
+    - what all is printed, when is printed
 - testing suite
     - what happens here
     - delivery message content is checked for all processes, by transitivity

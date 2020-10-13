@@ -11,7 +11,7 @@ accidental collision of image names with others submission.
 to re-build the docker image before starting the containers.
 
 There are 2 ways to run the containers.
-1. Use `test_multicast.py` to run the various test cases (Recommended) <br/>
+1. Use `test_multicast.py` to run the various test cases (**Recommended and requires python3**) <br/>
 It is a python script which uses `unittest` python framework to test various multicasting and snapshotting scenarios. <br/>
 All the test cases are present under the `MulticastSuite`.
     - Before running a test case, `MulticastSuite.setUp()` method is invoked by the unittest framework. 
@@ -60,7 +60,7 @@ All the test cases are present under the `MulticastSuite`.
     Command: `VERBOSE=1 python3 -m unittest test_multicast.MulticastSuite.<test case name> -v` <br/>
     
     Logs: 
-    - The application logs are emitted to the `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
+    - The application logs are emitted to `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
     
     - Along with this, a `logs/<hostname>` folder is created for each host and is mounted to the corresponding docker container.
     So along with `docker logs`, logs are also present under `logs/<hostname>/lab1.INFO` file. 
@@ -89,7 +89,7 @@ Command: `HOST='<hostname>'; docker run --name "${HOST}" --network cs7610-bridge
     If this flag is set for multiple docker containers, it will result in undefined behavior. 
     
     Logs: 
-    - The application logs are emitted to the `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
+    - The application logs are emitted to `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
 ### Stopping the docker containers
 Command: `./stop-docker-containers.sh`
 

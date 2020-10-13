@@ -121,8 +121,8 @@ namespace lab1 {
     template<typename T>
     std::string ContinuousMsgSender<T>::getCurrentState() {
         std::stringstream ss;
-        ss << "==================== start of the " << typeid(T).name() << " ContinuousMsgSender ====================\n";
-        ss << "======================= start of the sending queue =======================\n";
+        ss << "\n=================== start of the " << typeid(T).name() << " ContinuousMsgSender ===================\n";
+        ss << "\n======================= start of the sending queue =======================\n";
         {
             std::lock_guard<std::mutex> lockGuard(msgListMutex);
             for (const MsgHolder &msgHolder : msgList) {
@@ -134,8 +134,8 @@ namespace lab1 {
                 ss << "======================= end of the recipients =======================\n";
             }
         }
-        ss << "======================= end of the sending queue =======================\n";
-        ss << "==================== end of the " << typeid(T).name() << " ContinuousMsgSender ====================\n";
+        ss << "\n======================= end of the sending queue =======================\n";
+        ss << "\n==================== end of the " << typeid(T).name() << " ContinuousMsgSender ====================\n";
         return ss.str();
     }
 
@@ -371,28 +371,30 @@ namespace lab1 {
 
     std::string MulticastService::getCurrentState() {
         std::stringstream ss;
-        ss << "senderId: " << senderId << "\n"
+        ss << "\n================================= start of MutlicastService state =================================\n"
+           << "senderId: " << senderId << "\n"
            << "messageDelay: " << messageDelay.count() << "ms\n"
            << "dropRate: " << dropRate << "\n"
            << "currentMsgId: " << msgId << "\n"
            << "currSeqId: " << latestSeqId << "\n";
         for (const auto &pair1 : proposedSeqIdMap) {
-            ss << "=================== start of proposed Seq Id for MsdId: " << pair1.first << " ===================\n";
+            ss << "\n================== start of proposed Seq Id for MsdId: " << pair1.first << " ==================\n";
             for (const auto &pair2 : pair1.second) {
                 ss << pair2.first << " proposes: " << pair2.second << "\n";
             }
-            ss << "==================== End of proposed Seq Id for MsdId: " << pair1.first << " ====================\n";
+            ss << "\n=================== End of proposed Seq Id for MsdId: " << pair1.first << " ===================\n";
         }
 
         ss << dataMsgSender.getCurrentState() << "\n"
            << seqMsgSender.getCurrentState() << "\n"
            << holdBackQueue.getCurrentState() << "\n";
 
-        ss << "============================== start of ack message cache ==============================\n";
+        ss << "\n============================== start of ack message cache ==============================\n";
         for (const auto &pair : ackMessageCache) {
             ss << pair.second << "\n";
         }
-        ss << "============================== end of ack message cache ==============================\n";
+        ss << "\n============================== end of ack message cache ==============================\n"
+           << "\n================================= end of MutlicastService state =================================\n";
 
         return ss.str();
     }
@@ -498,11 +500,11 @@ namespace lab1 {
     }
 
     std::ostream &operator<<(std::ostream &o, const std::deque<PendingMsg> &deque) {
-        o << "============================= start of HoldBackQueue =============================\n";
+        o << "\n============================= start of HoldBackQueue =============================\n";
         for (const auto &pendingMsg : deque) {
             o << pendingMsg << "\n";
         }
-        o << "============================== end of HoldBackQueue ==============================\n";
+        o << "\n============================== end of HoldBackQueue ==============================\n";
         return o;
     }
 }

@@ -251,13 +251,14 @@ namespace lab1 {
                         << ", tcp server failed to listen for port" << listeningPort;
     }
 
-    TcpClient TcpServer::accept() {
+    TcpClient TcpServer::accept() const {
         LOG(INFO) << "waiting for connections on port: " << listeningPort;
         struct sockaddr_storage clientAddr;
         socklen_t sin_size = sizeof(clientAddr);
         int clientFd = ::accept(sockFd, (struct sockaddr *) &clientAddr, &sin_size);
         const std::string clientHostname = NetworkUtils::getHostnameFromSocket(&clientAddr);
         const int clientPort = std::stoi(NetworkUtils::getServiceNameFromSocket(&clientAddr));
+        LOG(INFO) << "received incoming connection from " << clientHostname << ":" << clientPort;
         return TcpClient(clientHostname, clientPort, clientFd);
     }
 

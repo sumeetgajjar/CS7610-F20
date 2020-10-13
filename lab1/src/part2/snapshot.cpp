@@ -17,7 +17,7 @@ namespace lab1 {
 
     void IncomingChannelState::recordMessage(const Message &message) {
         auto msgType = Serde::getMessageType(message);
-        VLOG(1) << "recording " << msgType << " from sender: " << message.sender;
+        VLOG(1) << "recording msgType: " << msgType << " from sender: " << message.sender;
         auto msgStr = [&]() {
             switch (msgType) {
                 case MessageType::Data: {
@@ -48,10 +48,10 @@ namespace lab1 {
             }
         }();
         messages.push_back(msgStr);
-        LOG(INFO) << "recorded " << msgType << " from sender: " << message.sender << ", message: " << msgStr;
+        LOG(INFO) << "recorded msgType: " << msgType << " from sender: " << message.sender << ", message: " << msgStr;
     }
 
-    std::vector<std::string> IncomingChannelState::getMessages() const {
+    const std::vector<std::string> &IncomingChannelState::getRecordedMessages() const {
         return messages;
     }
 
@@ -97,6 +97,7 @@ namespace lab1 {
         std::lock_guard<std::mutex> lockGuard(channelsToBeRecordedMutex);
         LOG(INFO) << "recording local state";
         localState = localStateGetter();
+        LOG(INFO) << "local state recorded";
         for (const auto &channel : channelsToRecord) {
             LOG(INFO) << "starting recording on channel: " << channel;
             channelsToBeRecorded.insert(channel);
@@ -110,20 +111,18 @@ namespace lab1 {
         std::vector<std::thread> ioThreads;
         for (int i = 0; i < allPeers.size(); ++i) {
             auto client = tcpServer.accept();
-            LOG(INFO) << "received incoming connection from " << client.getHostname() << ":" << client.getPort();
             ioThreads.emplace_back([&](TcpClient client) {
                 auto msg = client.receive();
                 MessageType msgType = Serde::getMessageType(msg);
                 const auto sender = msg.getParsedSender();
-                CHECK(msgType == MessageType::Marker)
-                                << "unknown message type: " << msgType << ", received from: " << sender;
+                CHECK(msgType == MessageType::Marker) << "unknown message type: " << msgType
+                                                      << ", received from: " << sender;
 
                 MarkerMessage markerMsg = Serde::deserializeMarkerMessage(msg);
                 {
                     std::lock_guard<std::mutex> lockGuard(snapshotInitiatedMutex);
                     if (!snapshotInitiated) {
-                        LOG(INFO) << "first marker message received from: " << sender
-                                  << ", markerMsg: " << markerMsg;
+                        LOG(INFO) << "first marker message received from: " << sender << ", markerMsg: " << markerMsg;
                         std::vector<std::string> remainingPeers(allPeers.size() - 1);
                         std::copy_if(allPeers.begin(), allPeers.end(), remainingPeers.begin(),
                                      [&](const std::string &peer) { return peer != sender; });
@@ -137,6 +136,7 @@ namespace lab1 {
                     std::lock_guard<std::mutex> lockGuard(channelsToBeRecordedMutex);
                     channelsToBeRecorded.erase(sender);
                 }
+                LOG(INFO) << "stopped recording on channel: " << sender;
             }, client);
         }
 
@@ -144,20 +144,7 @@ namespace lab1 {
             thread.join();
         }
         tcpServer.close();
-        LOG(INFO) << "snapshot algorithm completed";
-
-        std::stringstream ss;
-        ss << "\n=================================== start of localState ===================================\n"
-           << localState << "\n"
-           << "=================================== end of localState ===================================\n";
-
-        for (const auto &pair : incomingChannels) {
-            ss << "======================= start of state for " << pair.first << " channel =======================\n"
-               << pair.second << "\n"
-               << "======================== end of state for " << pair.first << " channel ========================\n";
-        }
-
-        LOG(INFO) << ss.str();
+        printSnapshot();
     }
 
     void SnapshotService::recordIncomingMessages(const Message &message) {
@@ -174,8 +161,28 @@ namespace lab1 {
         this->localStateGetter = std::move(getter);
     }
 
+    void SnapshotService::printSnapshot() const {
+        LOG(INFO) << "snapshot algorithm completed";
+
+        std::stringstream ss;
+        ss << "\n=================================== start of snapshot ===================================\n"
+           << "\n=================================== start of localState ===================================\n"
+           << "\n" << localState << "\n"
+           << "\n=================================== end of localState ===================================\n";
+
+        for (const auto &pair : incomingChannels) {
+            ss << "\n======================= start of state for " << pair.first << " channel =======================\n"
+               << "\n" << pair.second << "\n"
+               << "\n======================== end of state for " << pair.first << " channel ========================\n";
+        }
+
+        ss << "\n=================================== end of snapshot ===================================\n";
+
+        LOG(INFO) << ss.str();
+    }
+
     std::ostream &operator<<(std::ostream &o, const IncomingChannelState &incomingChannelState) {
-        for (const auto &msg: incomingChannelState.getMessages()) {
+        for (const auto &msg: incomingChannelState.getRecordedMessages()) {
             o << msg << "\n";
         }
         return o;

@@ -19,7 +19,7 @@ namespace lab1 {
     public:
         void recordMessage(const Message &message);
 
-        std::vector<std::string> getMessages() const;
+        const std::vector<std::string> &getRecordedMessages() const;
     };
 
     std::ostream &operator<<(std::ostream &o, const IncomingChannelState &incomingChannelState);
@@ -44,6 +44,8 @@ namespace lab1 {
         void takeSnapshot(const std::vector<std::string> &channelsToRecord);
 
         MarkerMessage createMarkerMessage() const;
+
+        void printSnapshot() const;
 
     public:
         explicit SnapshotService(uint32_t senderId, const std::vector<std::string> &peers);
