@@ -453,7 +453,7 @@ namespace lab1 {
             }
             std::lock_guard<std::mutex> lockGuard(dequeMutex);
             std::sort(deque.begin(), deque.end());
-            LOG(INFO) << "\n" << deque;
+            LOG(INFO) << deque;
             auto it = deque.begin();
             while (it != deque.end() && it->deliverable) {
                 DataMessage &dataMsg = it->dataMsg;
