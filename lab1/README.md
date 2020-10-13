@@ -58,6 +58,13 @@ All the test cases are present under the `MulticastSuite`.
     
     The verbosity of the logs can be increased by running the same command with VERBOSE=1 <br/>
     Command: `VERBOSE=1 python3 -m unittest test_multicast.MulticastSuite.<test case name> -v` <br/>
+    
+    Logs: 
+    - The application logs are emitted to the `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
+    
+    - Along with this, a `logs/<hostname>` folder is created for each host and is mounted to the corresponding docker container.
+    So along with `docker logs`, logs are also present under `logs/<hostname>/lab1.INFO` file. 
+    This redundancy of logs is to prevent loss of logs in cases where the docker container is removed. 
 
 2. Manually start the container for each `hostname` in the `hostfile`. <br/>
 Command: `HOST='<hostname>'; docker run --name "${HOST}" --network cs7610-bridge --hostname "${HOST}" sumeet-g-prj1 --v 0 --hostfile /hostfile  --senders "sumeet-g-alpha" --msgCount 4 --dropRate 0.0 --delay 0 --initiateSnapshotCount 0`
@@ -80,7 +87,9 @@ Command: `HOST='<hostname>'; docker run --name "${HOST}" --network cs7610-bridge
     - --initiateSnapshotCount: the number of messages after which the process will start the snapshot. <br/>
     **WARNING, WARNING, WARNING**: This flag should only be set for a single docker container. 
     If this flag is set for multiple docker containers, it will result in undefined behavior. 
-
+    
+    Logs: 
+    - The application logs are emitted to the `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
 ### Stopping the docker containers
 Command: `./stop-docker-containers.sh`
 

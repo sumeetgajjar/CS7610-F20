@@ -13,17 +13,18 @@ find_package(glog 0.4.0 REQUIRED)
 
 add_executable(lab1
         src/main.cpp
-        src/message.h
-        src/message.cpp
-        src/utils.h
-        src/utils.cpp
-        src/network_utils.h
-        src/network_utils.cpp
-        src/multicast.h
-        src/multicast.cpp
-        src/snapshot.h
-        src/snapshot.cpp
-        src/serde.h
-        src/serde.cpp)
+        src/common/message.h
+        src/common/message.cpp
+        src/common/utils.h
+        src/common/utils.cpp
+        src/common/network_utils.h
+        src/common/network_utils.cpp
+        src/common/serde.h
+        src/common/serde.cpp
+        src/part1/multicast.h
+        src/part1/multicast.cpp
+        src/part2/snapshot.h
+        src/part2/snapshot.cpp
+        )
 
 target_link_libraries(lab1 glog::glog gflags::gflags)

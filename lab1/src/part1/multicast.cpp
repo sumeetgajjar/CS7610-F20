@@ -8,8 +8,8 @@
 #include <glog/logging.h>
 
 #include "multicast.h"
-#include "serde.h"
-#include "utils.h"
+#include "../common/serde.h"
+#include "../common/utils.h"
 
 namespace lab1 {
 

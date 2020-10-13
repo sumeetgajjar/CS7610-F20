@@ -2,10 +2,10 @@
 #include <gflags/gflags.h>
 #include <csignal>
 
-#include "multicast.h"
-#include "network_utils.h"
-#include "snapshot.h"
-#include "utils.h"
+#include "part1/multicast.h"
+#include "common/network_utils.h"
+#include "part2/snapshot.h"
+#include "common/utils.h"
 
 
 using namespace lab1;

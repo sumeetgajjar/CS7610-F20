@@ -7,8 +7,8 @@
 
 #include <vector>
 #include <functional>
-#include "network_utils.h"
-#include "message.h"
+#include "../common/network_utils.h"
+#include "../common/message.h"
 
 #define SNAPSHOT_PORT 10002
 

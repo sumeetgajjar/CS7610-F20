@@ -12,8 +12,8 @@
 #include <functional>
 #include <condition_variable>
 #include <queue>
-#include "network_utils.h"
-#include "message.h"
+#include "../common/network_utils.h"
+#include "../common/message.h"
 
 #define MULTICAST_PORT 10001
 
