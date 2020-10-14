@@ -2,6 +2,9 @@
 build
 cmake-build-debug
 *.log
+cmake_modules
+logs
+__pycache__
 
 # Created by .ignore support plugin (hsz.mobi)
 ### CMake template
