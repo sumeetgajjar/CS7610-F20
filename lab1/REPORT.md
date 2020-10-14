@@ -127,7 +127,7 @@ messages each sender sends, manual verification becomes tedious and can lead to 
 
 To solve this problem, the `MulticastSuite` test suite was developed and can found in `test_multicast.py` file. The test
 suite contains various test cases to simulate multiple senders, dropping and delaying of messages. All the case are listed
-under [Test Cases](README.md#Test Cases) section in README.md.
+under [Test Cases](README.md#Test-Cases) section in README.md.
 
 Each test case invokes a `MulticastSuite.__test_wrapper` method, and simulates various cases by passing the corresponding
 argument. E.g. `drop_rate` is passed to simulate dropping messages, `delay` is passed to simulate message delays, so on
