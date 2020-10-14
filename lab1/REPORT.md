@@ -23,8 +23,8 @@ recipients in set `R`. It exposes a method `removeRecipient(uint32_t messageId, 
 to remove a recipient from the recipients set `R`. A message `M` is a part of the internal list until the recipients set `R`
 becomes empty.
 
-The initial interval is 200ms and then it increases exponentially upto a `maxSendingInterval=4000ms` (400ms, 800ms, 1600ms, 3200ms).
-Once the `maxSendingInterval` is reached, the interval is reset to 200ms.
+The initial interval is 200ms and then it increases exponentially upto a `maxSendingInterval=4000ms` (400ms, 800ms,
+1600ms, 3200ms). Once the `maxSendingInterval` is reached, the interval is reset to 200ms.
 
 Thus a message sent using `ContinuousMsgSender` will be retransmitted at a fixed interval no matter whether
 it is received or not at the receiver.

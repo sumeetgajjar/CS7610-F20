@@ -3,8 +3,8 @@
 ### Building the Docker image
 Command: `docker build . -t sumeet-g-prj1`
 
-*Note:* The image is purposefully tagged with my name prefix to prevent
-accidental collision of image names with others submission.
+*Note:* The image is purposefully tagged with my name prefix to prevent accidental collision of image names with other
+submissions.
 
 ### Starting the Docker containers
 *Note:*
@@ -15,19 +15,21 @@ starting the containers.
 there are no messages left for multicast.
 
 
-There are 2 ways to run the containers.
+#### There are 2 ways to run the containers.
 1. Use `test_multicast.py` to run the various test cases (**Recommended and requires python3**) <br/>
-It is a python script which uses `unittest` python framework to test various multicasting and snapshotting scenarios. <br/>
-All the test cases are present under the `MulticastSuite`.
+It is a python script which uses `unittest` framework to test various multicasting and snapshotting scenarios. <br/>
+All the test cases are present under the `MulticastSuite` test suite.
     - Before running a test case, `MulticastSuite.setUp()` method is invoked by the unittest framework.
-    Inside this method all the containers with name prefix `sumeet-g*` are stopped and then removed.
+    Inside this method all the containers with name prefix `sumeet-g*` are stopped (`docker stop`) and then removed
+    (`docker rm`).
 
     - After running a test case, `MulticastSuite.tearDown()` method is invoked by the unittest framework.
     Inside this method all the containers with name prefix `sumeet-g*` are stopped. The containers are not removed
     purposefully so that their logs can be accessed in case of a failure.
 
-    - **AssertCondition:** Once all messages are delivered to the processes, all the tests assert on the delivery order of messages for each process.
-    The delivery order should be the same for all the processes, if not the assertion throws an exception and hence the test case fails.
+    - **AssertCondition:** Once all messages are delivered to the processes, all the tests assert on the delivery order
+    of messages for each process. The delivery order should be the same for all the processes, if not, the assertion
+    throws an exception and the test case fails.
 
     ##### Test Cases
     - mutlicast test cases
@@ -66,10 +68,11 @@ All the test cases are present under the `MulticastSuite`.
 
     Logs:
     - The application logs are emitted to `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
+    **(Recommended)**
 
     - Along with this, a `logs/<hostname>` folder is created for each host and is mounted to the corresponding docker container.
     So along with `docker logs`, logs are also present under `logs/<hostname>/lab1.INFO` file.
-    This redundancy of logs is to prevent loss of logs in cases where the docker container is removed.
+    This redundancy of logs is to prevent loss of logs in case the docker container is unknowingly removed.
 
 2. Manually start the container for each `hostname` in the `hostfile`. <br/>
 Command: `HOST='<hostname>'; docker run --name "${HOST}" --network cs7610-bridge --hostname "${HOST}" sumeet-g-prj1 --v 0 --hostfile /hostfile  --senders "sumeet-g-alpha" --msgCount 4 --dropRate 0.0 --delay 0 --initiateSnapshotCount 0`
