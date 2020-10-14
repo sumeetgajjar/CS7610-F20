@@ -95,6 +95,7 @@ E.g. `I1013 05:04:15.607774    11 multicast.cpp:460] delivering dataMsg: type: 1
 `random_number < dropRate`, the message is dropped.
 - Before dropping the message, a log line is printed to indicate message drop. <br/>
 E.g. `W1013 04:49:14.118077     8 multicast.cpp:349] dropping SeqAckMsg from: sumeet-g-beta.cs7610-bridge`
+
 *Note:* grepping for the dropped messages will show a lot of `DataMessage` and `SeqMessage` relative to `AckMessage` and
 `SeqAckMessage`, since `ContinuousMsgSender<DataMessage>` and `ContinuousMsgSender<SeqMessage>` are sending them
 at regular intervals.
@@ -104,6 +105,7 @@ at regular intervals.
 50% of the message are delayed by the given `delay`.
 - Before delaying the message, a log line is printed to indicate message delay. <br/>
 E.g. `W1013 04:40:28.443655     8 multicast.cpp:356] delaying messageType: SeqAckMsg by 2000ms`
+
 *Note:* `DataMessage` and `SeqMessage` are sent continuously over a regular interval, this induces an inherent delay.
 Hence grepping for delayed messages will only show `AckMessage` and `SeqAckMessage`.
 
