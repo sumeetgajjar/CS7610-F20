@@ -88,12 +88,17 @@ E.g. `I1013 05:04:15.607774    11 multicast.cpp:460] delivering dataMsg: type: 1
 `random_number < dropRate`, the message is dropped.
 - Before dropping the message, a log line is printed to indicate message drop. <br/>
 E.g. `W1013 04:49:14.118077     8 multicast.cpp:349] dropping SeqAckMsg from: sumeet-g-beta.cs7610-bridge`
+*Note:* grepping for the dropped messages will show a lot of `DataMessage` and `SeqMessage` relative to `AckMessage` and
+`SeqAckMessage`, since `ContinuousMsgSender<DataMessage>` and `ContinuousMsgSender<SeqMessage>` are sending them
+at regular intervals.
 
 ##### How message delay in transit is simulated?
 - Before sending a `AckMessage` or `SeqAckMessage`, `MulticastService::delayMessage` is invoked. If `--delay` is set, then
 50% of the message are delayed by the given `delay`.
 - Before delaying the message, a log line is printed to indicate message delay. <br/>
 E.g. `W1013 04:40:28.443655     8 multicast.cpp:356] delaying messageType: SeqAckMsg by 2000ms`
+*Note:* `DataMessage` and `SeqMessage` are sent continuously over a regular interval, this induces an inherent delay.
+Hence grepping for delayed messages will only show `AckMessage` and `SeqAckMessage`.
 
 ##### What happens if a message is dropped or delayed?
 
@@ -136,12 +141,16 @@ After starting all the docker containers, it tails the container logs until the 
 Once all the messages are delivered to all processes, the delivery order of messages across all processes is asserted
 with each other. If delivery order of any message is different for any process, then the test case fails.
 
+# Chandy Lamport Snapshot Algorithm
+
+##### Recording Local State
+
+##### Recording Incoming Channels
+
+##### On algorithm termination
+
 - Snapshot
     - what all is printed, when is printed
-
-- specify why data and seq message are delayed inherently (due to sending interval)
-
-- dropping will show data and seq majorly due to the continuous message based design
 
 - the containers do not exit on their own, but are stopped in the tearDown phase of the test
 
