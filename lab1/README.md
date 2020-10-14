@@ -29,7 +29,7 @@ All the test cases are present under the `MulticastSuite`.
     - **AssertCondition:** Once all messages are delivered to the processes, all the tests assert on the delivery order of messages for each process.
     The delivery order should be the same for all the processes, if not the assertion throws an exception and hence the test case fails.
 
-    The various scenarios are as follows:
+    #####Test Cases
     - mutlicast test cases
         - `test_one_sender`: runs the containers with first host in the `hostfile` as sender
 

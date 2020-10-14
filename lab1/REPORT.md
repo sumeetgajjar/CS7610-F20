@@ -77,6 +77,24 @@ have same `final_seq`, then the one which is undeliverable is placed ahead of de
 - This approach helps to keep the design generic and implementation simple. This simplified design helps the
 implementation to avoid using unnecessary `if-else`.
 
+##### How a message is delivered?
+- Once a message is popped out of the `HoldBackQueue`, the `MsgDeliveryCb` is invoked on the popped `dataMsg`.
+- Before invoking the callback, a log line is printed to indicate delivery. <br/>
+E.g. `I1013 05:04:15.607774    11 multicast.cpp:460] delivering dataMsg: type: 1, sender: 2, msg_id: 4, data: 14, finalSeqId: 9, finalSeqProposer: 1`
+
+##### How message loss in transit is simulated?
+- All messages are received inside `MulticastService::startListeningForMessages()`. On arrival of any time of a message,
+`MulticastService::dropMessage` is invoked. If `--dropRate` is set, then it generates a `0 < random_number < 1`, if the
+`random_number < dropRate`, the message is dropped.
+- Before dropping the message, a log line is printed to indicate message drop. <br/>
+E.g. `W1013 04:49:14.118077     8 multicast.cpp:349] dropping SeqAckMsg from: sumeet-g-beta.cs7610-bridge`
+
+##### How message delay in transit is simulated?
+- Before sending a `AckMessage` or `SeqAckMessage`, `MulticastService::delayMessage` is invoked. If `--delay` is set, then
+50% of the message are delayed by the given `delay`.
+- Before delaying the message, a log line is printed to indicate message delay. <br/>
+E.g. `W1013 04:40:28.443655     8 multicast.cpp:356] delaying messageType: SeqAckMsg by 2000ms`
+
 ##### What happens if a message is dropped or delayed?
 
 *Note:* A `MsgIdentifier` which consists of `sender` and `msg_id` is used to identify duplicate messages.
@@ -101,16 +119,26 @@ implementation to avoid using unnecessary `if-else`.
     continue until a `SeqAckMessage` is received at `s`.
     - Duplicate `SeqAckMessage` received at `s` will be dropped.
 
+### Testing the MulticastService
+
+During the development phase, it was important to check whether all processes agree on the delivery order of all messages.
+Manual verification helps, if there is just one multicast sender. On increasing the number of senders and the number of
+messages each sender sends, manual verification becomes tedious and can lead to false positives or true negatives.
+
+To solve this problem, the `MulticastSuite` test suite was developed and can found in `test_multicast.py` file. The test
+suite contains various test cases to simulate multiple senders, dropping and delaying of messages. All the case are listed
+under [Test Cases](README.md#Test Cases) section in README.md.
+
+Each test case invokes a `MulticastSuite.__test_wrapper` method, and simulates various cases by passing the corresponding
+argument. E.g. `drop_rate` is passed to simulate dropping messages, `delay` is passed to simulate message delays, so on
+and so forth. The `MulticastSuite.__test_wrapper` method starts docker containers for each host mentioned in the `hostfile`.
+After starting all the docker containers, it tails the container logs until the expected number of messages are delivered.
+Once all the messages are delivered to all processes, the delivery order of messages across all processes is asserted
+with each other. If delivery order of any message is different for any process, then the test case fails.
 
 - Snapshot
     - what all is printed, when is printed
-- testing suite
-    - what happens here
-    - delivery message content is checked for all processes, by transitivity
 
-- how a self message is delivered
-
-- the message delay test may take a while to complete since, 50% of the messages are being delayed by 2000ms
 - specify why data and seq message are delayed inherently (due to sending interval)
 
 - dropping will show data and seq majorly due to the continuous message based design
@@ -118,5 +146,3 @@ implementation to avoid using unnecessary `if-else`.
 - the containers do not exit on their own, but are stopped in the tearDown phase of the test
 
 - the local state of the sender will only contain data for continuous sender
-
-- breaking ties, two senders by induction n senders.
