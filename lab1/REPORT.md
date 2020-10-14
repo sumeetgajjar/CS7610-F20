@@ -9,22 +9,19 @@ a multicast message needs to be delivered to the process.
 
 ### Implementing Reliable Delivery of Messages using UDP
 
-This total order multicast implementation uses UDP for sending various types of messages. Since UDP does not guaranty
-delivery of messages, it is implemented at the application level.
-
 ##### ContinuousMsgSender
 
 Mutlicast service uses UDP to send and receive various types of messages.
 UDP inherently does not guaranty delivery messages, a message sent can be lost in transit and never be delivered.
 The reliable delivery of messages is implemented an abstraction inside `ContinuousMsgSender`.
-`ContinuousMsgSender` is a C++ templated class. It internally maintains a list of messages of type `T` and for each
+`ContinuousMsgSender` is a C++ templated class. It internally maintains a list of messages of type `T`, for each
 message `M` it maintains a set of recipients `R`. At a interval `t`, it sends out message `M` to all its
 recipients in set `R`. It exposes a method `removeRecipient(uint32_t messageId, const std::string &recipient)`
-to remove a recipient from the recipients set `R`. A message `M` is a part of the internal list until the recipients set `R`
-becomes empty.
+to remove a recipient from Message `M`'s recipients set `R`. A message `M` is a part of the internal list until its
+recipients set `R` becomes empty.
 
-The initial interval is 200ms and then it increases exponentially upto a `maxSendingInterval=4000ms` (400ms, 800ms,
-1600ms, 3200ms). Once the `maxSendingInterval` is reached, the interval is reset to 200ms.
+The initial of the interval `t` is 200ms and then it increases exponentially upto a `maxSendingInterval=4000ms`
+(400ms, 800ms, 1600ms, 3200ms). Once the `maxSendingInterval` is reached, the interval is reset to 200ms.
 
 Thus a message sent using `ContinuousMsgSender` will be retransmitted at a fixed interval no matter whether
 it is received or not at the receiver.
@@ -35,8 +32,7 @@ The state machine of the Multicast Service is as follows:
 
 ### Implementing the State Machine
 
-*Note:* In addition to `DataMessage`, `AckMessage` and `SeqMessage`, `SeqAckMessage` is introduced which acks as an 
-acknowledgement to `SeqMessage`.
+*Note:* A new message `SeqAckMessage` is introduced, it acks as an acknowledgement to `SeqMessage`.
 
 - In order to send a multicast message, a sender `s` creates a `DataMessage` and queues it with an instance of
 `ContinuousMsgSender<DataMessage>`. `ContinuousMsgSender<DataMessage>` starts sending the `DataMessage` to all
@@ -44,6 +40,7 @@ its recipients.
 
 - On receiving a `DataMessage` at a recipient `r`, `r` add the `DataMessage` to the `HoldBackQueue` along with a
 `proposedSeq` and `r` sends `AckMessage` to `s` once.
+
     The `AckMessage` serves two purposes:
     - It contains the `proposed_seq` for a `DataMessage`
     - It acks as acknowledgement for `s` that `r` received the `DataMessage`
@@ -53,13 +50,15 @@ inside `ContinuousMsgSender<DataMessage>`, `ContinuousMsgSender<DataMessage>` st
 Once `AckMessage` from all recipients is received, `s` creates a `SeqMessage` and queues it with an instance of
 `ContinuousMsgSender<SeqMessage>`. `ContinuousMsgSender<SeqMessage>` starts sending the `SeqMessage` to all
 its recipients.
+
     The `SeqMessage` serves two purposes:
     - It contains the `final_seq` for a `DataMessage`
     - It acks as acknowledgement for `r` that `s` received the `DataMessage`
 
 - On receiving a `SeqMessage` at a recipient `r`, `r` marks the `DataMessage` in `HoldBackQueue` as deliverable and
-sorts the `HoldBackQueue` and sends `SeqAckMessage` to `s` once. If a `DataMessage` at front of the queue is deliverable,
-it delivers it.
+sorts the `HoldBackQueue` and sends `SeqAckMessage` to `s` once. If a `DataMessage` at front of the `HoldBackQueue`
+is deliverable, it delivers it.
+
     The `SeqAckMessage` serves the following purposes:
     - It acks as acknowledgement for `s` that `r` received the `SeqMessage`
 
@@ -73,9 +72,11 @@ the `final_seq`, the `final_seq_proposer` and whether the message is `deliverabl
 - No two messages in the `HoldBackQueue` can have same `sender` and same `msg_id`. This invariant helps discard the
 duplicate `DataMessage` which are received due to retransmission.
 
-- As soon as a `PendingMsg` is marked deliverable, the `deque` is sorted according to the `final_seq`. If two messages
-have same `final_seq`, then the one which is undeliverable is placed ahead of deliverable. If two messages have same
-`final_seq` and are undeliverable, then the message with smaller `final_seq_proposer` is placed ahead.
+- As soon as a `PendingMsg` is marked deliverable, the `deque` is sorted according to the `final_seq`.
+    - Breaking ties  
+        - If two messages have same `final_seq`, then the one which is undeliverable is placed ahead of deliverable. 
+        - If two messages have same `final_seq` and are undeliverable, then the message with smaller 
+        `final_seq_proposer` is placed ahead.
 
 ##### How a process delivers its own message?
 - The process also sends the multicast `DataMessage` to itself and follows the state machine to deliver its own message.
@@ -88,7 +89,7 @@ implementation to avoid using unnecessary `if-else`.
 - Before invoking the callback, a log line is printed to indicate delivery. <br/>
 E.g. `I1013 05:04:15.607774    11 multicast.cpp:460] delivering dataMsg: type: 1, sender: 2, msg_id: 4, data: 14, finalSeqId: 9, finalSeqProposer: 1`
 
-##### How message loss in transit is simulated?
+##### How message loss/drop in transit is simulated?
 - All messages are received inside `MulticastService::startListeningForMessages()`. On arrival of any time of a message,
 `MulticastService::dropMessage` is invoked. If `--dropRate` is set, then it generates a `0 < random_number < 1`, if the
 `random_number < dropRate`, the message is dropped.
@@ -140,12 +141,17 @@ To solve this problem, the `MulticastSuite` test suite was developed and can fou
 suite contains various test cases to simulate multiple senders, dropping and delaying of messages. All the case are listed
 under [Test Cases](README.md#Test-Cases) section in README.md.
 
-Each test case invokes a `MulticastSuite.__test_wrapper` method, and simulates various cases by passing the corresponding
+Each test case invokes the `MulticastSuite.__test_wrapper` method, and simulates various cases by passing the corresponding
 argument. E.g. `drop_rate` is passed to simulate dropping messages, `delay` is passed to simulate message delays, so on
 and so forth. The `MulticastSuite.__test_wrapper` method starts docker containers for each host mentioned in the `hostfile`.
 After starting all the docker containers, it tails the container logs until the expected number of messages are delivered.
 Once all the messages are delivered to all processes, the delivery order of messages across all processes is asserted
 with each other. If delivery order of any message is different for any process, then the test case fails.
+
+### Implementation issues
+- Reliable delivery of messages using UDP: solved using `ContinuousSender<T>`
+- How does sender know that `SeqMessage` is received?: solved by introducing `SeqAckMessage`
+- Testing the MulticastService: solved using `MulticastSuite` test suite
 
 # Chandy Lamport Snapshot Algorithm
 
@@ -275,3 +281,8 @@ sumeet-g-alpha
 
 =================================== end of snapshot ===================================
 ```
+
+### Implementation issues
+- Capturing localState of MutlicastService: solved by exposing `MulticastService::getCurrentState`
+- Capturing all incoming channels of MutlicastService: solved by using a callback which is invoked when a message is
+received in MulticastService
