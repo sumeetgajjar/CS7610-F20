@@ -9,6 +9,9 @@ a multicast message needs to be delivered to the process.
 
 ### Implementing Reliable Delivery of Messages using UDP
 
+This total order multicast implementation uses UDP for sending various types of messages. Since UDP does not guaranty
+delivery of messages, it is implemented at the application level.
+
 ##### ContinuousMsgSender
 
 Mutlicast service uses UDP to send and receive various types of messages.
@@ -31,6 +34,9 @@ The state machine of the Multicast Service is as follows:
 ![State Machine](lab1-state-machine.png)
 
 ### Implementing the State Machine
+
+*Note:* In addition to `DataMessage`, `AckMessage` and `SeqMessage`, `SeqAckMessage` is introduced which acks as an 
+acknowledgement to `SeqMessage`.
 
 - In order to send a multicast message, a sender `s` creates a `DataMessage` and queues it with an instance of
 `ContinuousMsgSender<DataMessage>`. `ContinuousMsgSender<DataMessage>` starts sending the `DataMessage` to all
@@ -143,15 +149,129 @@ with each other. If delivery order of any message is different for any process, 
 
 # Chandy Lamport Snapshot Algorithm
 
+This implementation of the algorithm uses TCP to send `MarkerMessage` to peers. The `SnapshotService` is completely
+de-coupled from the `MulticastService`. None of the services know about each other and thus can be plugged in and out as
+required. Both services communicate via callback mechanism.
+
+*Note:* Since `SnapshotService` uses TCP and `MulticastService` uses UDP to communicate with the peers, the FIFO assumption that
+Chandy Lamport Snapshot Algorithm makes is violated here. This violation is OKAY for this project and has been clarified
+by the professor. 
+
 ##### Recording Local State
+`SnapshotService` needs to record the local state of the process. In order to do that it takes a `localStateGetter` which
+can be set using the `SnapshotService::setLocalStateGetter` method. When the algorithm needs to take the local snapshot,
+it invokes `localStateGetter()` and stores the output in `localState`. In order to keep things simple for the purpose
+of this project, the `localState` is stored as `std::string`. For practical applications it can be stored as
+`SerializedByteStream`.
+
+Before recording the local state, a log line is printed to indicate the same.<br/>
+E.g. `I1012 06:12:03.521102     1 snapshot.cpp:94] recording local state`
 
 ##### Recording Incoming Channels
+`SnapshotService` exposes a method `SnapshotService::recordIncomingMessages` which can be invoked to record a message on
+a incoming channel. This method records the message only if the Snapshot algorithm is initiated. In case this method is
+invoked when Snapshot algorithm is initiated, the message is simply discarded. 
+
+`MulticastService` during its construction, takes a callback which is invoked whenever a message is received by the
+`MulticastService`. While constructing the `MulticastService` we pass `SnapshotService::recordIncomingMessages` as the
+`incomingMessageCb`. This abstraction enables the `SnapshotService` to capture the incoming messages to 
+`MulticastService`.
 
 ##### On algorithm termination
+Once the service receives `MarkerMessage` from all the peers, the algorithm terminates. On termination it prints the
+local state of the process and recorded state of the channel.<br/>
+E.g. 
+```
+I1014 06:04:32.643627     8 snapshot.cpp:181] 
+=================================== start of snapshot ===================================
 
-- Snapshot
-    - what all is printed, when is printed
+=================================== start of localState ===================================
 
-- the containers do not exit on their own, but are stopped in the tearDown phase of the test
 
-- the local state of the sender will only contain data for continuous sender
+================================= start of MutlicastService state =================================
+senderId: 1
+messageDelay: 0ms
+dropRate: 0
+currentMsgId: 4
+currSeqId: 0
+
+=================== start of the N4lab111DataMessageE ContinuousMsgSender ===================
+
+======================= start of the sending queue =======================
+Data: type: 1, sender: 1, msg_id: 1, data: 11
+======================= start of the recipients =======================
+sumeet-g-delta
+sumeet-g-beta
+sumeet-g-gamma
+sumeet-g-alpha
+======================= end of the recipients =======================
+Data: type: 1, sender: 1, msg_id: 2, data: 12
+======================= start of the recipients =======================
+sumeet-g-delta
+sumeet-g-beta
+sumeet-g-gamma
+sumeet-g-alpha
+======================= end of the recipients =======================
+Data: type: 1, sender: 1, msg_id: 3, data: 13
+======================= start of the recipients =======================
+sumeet-g-delta
+sumeet-g-beta
+sumeet-g-gamma
+sumeet-g-alpha
+======================= end of the recipients =======================
+Data: type: 1, sender: 1, msg_id: 4, data: 14
+======================= start of the recipients =======================
+sumeet-g-delta
+sumeet-g-beta
+sumeet-g-gamma
+sumeet-g-alpha
+======================= end of the recipients =======================
+
+======================= end of the sending queue =======================
+
+==================== end of the N4lab111DataMessageE ContinuousMsgSender ====================
+
+
+=================== start of the N4lab110SeqMessageE ContinuousMsgSender ===================
+
+======================= start of the sending queue =======================
+
+======================= end of the sending queue =======================
+
+==================== end of the N4lab110SeqMessageE ContinuousMsgSender ====================
+
+
+============================= start of HoldBackQueue =============================
+
+============================== end of HoldBackQueue ==============================
+
+
+============================== start of ack message cache ==============================
+
+============================== end of ack message cache ==============================
+
+================================= end of MutlicastService state =================================
+
+
+=================================== end of localState ===================================
+
+======================= start of state for sumeet-g-gamma channel =======================
+
+
+
+======================== end of state for sumeet-g-gamma channel ========================
+
+======================= start of state for sumeet-g-delta channel =======================
+
+
+
+======================== end of state for sumeet-g-delta channel ========================
+
+======================= start of state for sumeet-g-beta channel =======================
+
+
+
+======================== end of state for sumeet-g-beta channel ========================
+
+=================================== end of snapshot ===================================
+```
