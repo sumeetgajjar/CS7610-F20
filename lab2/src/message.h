@@ -16,8 +16,10 @@ namespace lab2 {
     typedef uint32_t RequestId;
     typedef uint32_t ViewId;
     typedef uint32_t PeerId;
+    typedef uint32_t OperationType;
 
-    enum MessageType {
+    // MsgType and MsgTypeEnum are declared separately to facilitate serialization and deserialization
+    enum MsgTypeEnum {
         REQUEST = 1,
         OK = 2,
         NEW_VIEW = 3,
@@ -25,7 +27,8 @@ namespace lab2 {
         NEW_LEADER = 5
     };
 
-    enum OperationType {
+    // OperationType and OperationTypeEnum are declared separately to facilitate serialization and deserialization
+    enum OperationTypeEnum {
         NOTHING = 0,
         ADD = 1,
         DEL = 2,
@@ -65,9 +68,9 @@ namespace lab2 {
         OperationType operationType; // should always be equal to 3
     } NewLeaderMsg;
 
-    std::ostream &operator<<(std::ostream &o, const MessageType &messageType);
+    std::ostream &operator<<(std::ostream &o, const MsgTypeEnum &msgTypeEnum);
 
-    std::ostream &operator<<(std::ostream &o, const OperationType &operationType);
+    std::ostream &operator<<(std::ostream &o, const OperationTypeEnum &operationTypeEnum);
 
     std::ostream &operator<<(std::ostream &o, const RequestMsg &requestMsg);
 

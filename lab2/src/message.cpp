@@ -4,9 +4,9 @@
 #include "message.h"
 
 namespace lab2 {
-    std::ostream &operator<<(std::ostream &o, const MessageType &messageType) {
+    std::ostream &operator<<(std::ostream &o, const MsgTypeEnum &msgTypeEnum) {
         const auto messageTypeStr = [&]() {
-            switch (messageType) {
+            switch (msgTypeEnum) {
                 case REQUEST:
                     return "RequestMsg";
                 case OK:
@@ -18,16 +18,16 @@ namespace lab2 {
                 case NEW_LEADER:
                     return "NewLeaderMsg";
                 default:
-                    throw std::runtime_error("unknown message type: " + std::to_string(messageType));
+                    throw std::runtime_error("unknown message type: " + std::to_string(msgTypeEnum));
             }
         }();
         o << messageTypeStr;
         return o;
     }
 
-    std::ostream &operator<<(std::ostream &o, const OperationType &operationType) {
+    std::ostream &operator<<(std::ostream &o, const OperationTypeEnum &operationTypeEnum) {
         const auto operationTypeStr = [&]() {
-            switch (operationType) {
+            switch (operationTypeEnum) {
                 case NOTHING:
                     return "Nothing";
                 case ADD:
@@ -37,7 +37,7 @@ namespace lab2 {
                 case PENDING:
                     return "Pending";
                 default:
-                    throw std::runtime_error("unknown operation type: " + std::to_string(operationType));
+                    throw std::runtime_error("unknown operation type: " + std::to_string(operationTypeEnum));
             }
         }();
         o << operationTypeStr;
