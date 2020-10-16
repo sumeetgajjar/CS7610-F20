@@ -1,5 +1,4 @@
 #include <csignal>
-#include <iostream>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 #include <unordered_map>
@@ -20,6 +19,8 @@ void registerSignalHandlers() {
     signal(SIGTERM, handleSignal);
     signal(SIGKILL, handleSignal);
     signal(SIGABRT, handleSignal);
+    signal(SIGSEGV, handleSignal);
+    signal(SIGBUS, handleSignal);
 }
 
 int main(int argc, char **argv) {

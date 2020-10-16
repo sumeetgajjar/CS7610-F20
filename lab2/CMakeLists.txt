@@ -13,10 +13,16 @@ configure_file(hostfile hostfile COPYONLY)
 
 add_executable(lab2
         src/main.cpp
-        src/network_utils.h
         src/network_utils.cpp
-        src/utils.h
+        src/network_utils.h
         src/utils.cpp
+        src/utils.h
+        src/membership.cpp
+        src/membership.h
+        src/message.cpp
+        src/message.h
+        src/serde.cpp
+        src/serde.h
         )
 
 target_link_libraries(lab2 glog::glog gflags::gflags)
