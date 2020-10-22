@@ -8,3 +8,4 @@ This report contains all the Labs and Homeworks for the Foundation of Distribute
 
 ## Homeworks
 - [Hw1](hw1/hw1.pdf)
+- [Hw2](hw2/hw2.pdf)
