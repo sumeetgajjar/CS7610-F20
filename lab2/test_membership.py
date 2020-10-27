@@ -4,7 +4,7 @@ import os
 import subprocess
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Callable
+from typing import Dict, List, Callable, Any
 
 
 def configure_logging(level=logging.INFO):
@@ -94,7 +94,7 @@ class BaseSuite(unittest.TestCase):
         return log_lines
 
     @classmethod
-    def tail_container_logs(cls, container_name: str, callback: Callable[[str, ...], bool],
+    def tail_container_logs(cls, container_name: str, callback: Callable[[str, Any], bool],
                             *args, **kwargs) -> None:
         continue_tailing = True
         with subprocess.Popen(['docker', 'logs', container_name, '-f'],

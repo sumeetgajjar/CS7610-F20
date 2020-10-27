@@ -21,7 +21,7 @@ namespace lab2 {
 
     class PeerCrashedException : public std::runtime_error {
     public:
-        PeerCrashedException(const std::string &message);
+        explicit PeerCrashedException(const std::string &message);
     };
 
     class MembershipService {
@@ -40,7 +40,9 @@ namespace lab2 {
         TcpClientMap tcpClientMap;
         RequestMsg pendingRequest;
 
-        [[noreturn]] void startListening();
+        RequestMsg createRequestMsg(PeerId newPeerId);
+
+        OkMsg createOkMsg() const;
 
         void sendRequestMsg(PeerId peerId, const RequestMsg &requestMsg);
 
@@ -48,33 +50,30 @@ namespace lab2 {
 
         void sendNewViewMsg();
 
-        void addPeerToMembershipList(PeerId newPeerId);
-
-        [[noreturn]] void connectToLeader();
-
-        void handleLeaderCrash();
-
-        static void checkIfPeerCrashed(PeerId peerId, const Message &message);
-
-        void printNewlyInstalledView();
-
         void waitForAddRequestMsg();
 
         void waitForNewViewMsg();
 
-        OkMsg waitForOkMsg(PeerId peerId);
+        void waitForOkMsg(PeerId peerId, RequestId expectedRequestId);
 
         bool conflict(PeerId peerId) const;
 
+        void addPeerToMembershipList(PeerId newPeerId);
+
+        static void checkIfPeerCrashed(PeerId peerId, const Message &message);
+
+        [[noreturn]] void startListening();
+
+        [[noreturn]] void connectToLeader();
+
+        void printNewlyInstalledView();
+
     public:
+
         MembershipService(int membershipPort, int heartBeatPort,
                           std::vector<std::string> allPeerHostnames_);
 
         void start();
-
-        RequestMsg createRequestMsg(PeerId newPeerId);
-
-        OkMsg createOkMsg() const;
     };
 }
 #endif //LAB2_MEMBERSHIP_H
