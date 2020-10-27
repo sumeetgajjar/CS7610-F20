@@ -6,6 +6,13 @@
 
 namespace lab2 {
 
+    MsgTypeEnum SerDe::getMsgType(const Message &message) {
+        VLOG(1) << "inside getMsgType, size: " << message.n << ", sender: " << message.sender;
+        CHECK(message.n > 0) << ", found a msg of size 0 bytes, sender: " << message.sender;
+        auto *ptr = reinterpret_cast<const MsgType *>(message.buffer);
+        return static_cast<MsgTypeEnum>(::ntohl(*ptr));
+    }
+
     void SerDe::serializeRequestMsg(const RequestMsg &requestMsg, char *buffer) {
         VLOG(1) << "serializing RequestMsg: " << requestMsg;
         auto *ptr = reinterpret_cast<RequestMsg *>(buffer);

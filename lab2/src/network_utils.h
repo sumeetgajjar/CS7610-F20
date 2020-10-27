@@ -8,8 +8,7 @@
 #include <string>
 #include <netdb.h>
 
-#define MAX_UDP_BUFFER_SIZE 1024
-#define MAX_TCP_BUFFER_SIZE 1024
+#define MAX_BUFFER_SIZE 1024
 #define TCP_BACKLOG_QUEUE_SIZE 20
 
 namespace lab2 {
@@ -26,11 +25,11 @@ namespace lab2 {
 
     class Message {
     public:
-        const char *buffer;
         const size_t n;
         const std::string sender;
+        char buffer[MAX_BUFFER_SIZE];
     public:
-        Message(const char *buffer, size_t n, std::string sender);
+        Message(const char *buffer_, size_t n, std::string sender);
 
         std::string getParsedSender() const;
     };
@@ -62,7 +61,7 @@ namespace lab2 {
     public:
         explicit UDPReceiver(int portToListen);
 
-        std::pair<int, std::string> receive(char *buffer, size_t n);
+        std::pair<size_t, std::string> receive(char *buffer, size_t n);
 
         void close();
     };
@@ -78,7 +77,7 @@ namespace lab2 {
 
         TcpClient(std::string hostname_, int port);
 
-        const std::string &getHostname() const;
+        std::string getHostname() const;
 
         int getPort() const;
 

@@ -45,46 +45,47 @@ namespace lab2 {
     }
 
     std::ostream &operator<<(std::ostream &o, const RequestMsg &requestMsg) {
-        o << "msgType: " << requestMsg.msgType
+        o << "msgType: " << static_cast<MsgTypeEnum>(requestMsg.msgType)
           << ", requestId: " << requestMsg.requestId
           << ", currentViewId: " << requestMsg.currentViewId
-          << ", operationType: " << requestMsg.operationType
+          << ", operationType: " << static_cast<OperationTypeEnum>(requestMsg.operationType)
           << ", peerId: " << requestMsg.peerId;
         return o;
     }
 
     std::ostream &operator<<(std::ostream &o, const OkMsg &okMsg) {
-        o << "msgType: " << okMsg.msgType
+        o << "msgType: " << static_cast<MsgTypeEnum>(okMsg.msgType)
           << ", requestId: " << okMsg.requestId
           << ", currentViewId: " << okMsg.currentViewId;
         return o;
     }
 
     std::ostream &operator<<(std::ostream &o, const NewViewMsg &newViewMsg) {
-        o << "msgType: " << newViewMsg.msgType
+        o << "msgType: " << static_cast<MsgTypeEnum>(newViewMsg.msgType)
           << ", newViewId: " << newViewMsg.newViewId
           << ", numberOfMembers: " << newViewMsg.numberOfMembers;
-        o << ", members: ";
+        o << ", members: {";
         for (int i = 0; i < newViewMsg.numberOfMembers; ++i) {
             if (i != 0) {
                 o << ", ";
             }
             o << newViewMsg.members[i];
         }
+        o << "}";
         return o;
     }
 
     std::ostream &operator<<(std::ostream &o, const HeartBeatMsg &heartBeatMsg) {
-        o << "msgType: " << heartBeatMsg.msgType
+        o << "msgType: " << static_cast<MsgTypeEnum>(heartBeatMsg.msgType)
           << ", peerId: " << heartBeatMsg.peerId;
         return o;
     }
 
     std::ostream &operator<<(std::ostream &o, const NewLeaderMsg &newLeaderMsg) {
-        o << "msgType: " << newLeaderMsg.msgType
+        o << "msgType: " << static_cast<MsgTypeEnum>(newLeaderMsg.msgType)
           << ", requestId: " << newLeaderMsg.requestId
           << ", currentViewId: " << newLeaderMsg.currentViewId
-          << ", operationType: " << newLeaderMsg.operationType;
+          << ", operationType: " << static_cast<OperationTypeEnum>(newLeaderMsg.operationType);
         return o;
     }
 }

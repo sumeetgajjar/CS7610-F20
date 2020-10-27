@@ -1,10 +1,13 @@
 #include <csignal>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
-#include <unordered_map>
+#include <thread>
 
-#include "network_utils.h"
 #include "utils.h"
+#include "membership.h"
+
+#define MEMBERSHIP_PORT 10000
+#define HEARTBEAT_PORT 10001
 
 DEFINE_string(hostfile, "", "path to the hostfile");
 DEFINE_validator(hostfile, [](const char *, const std::string &value) {
@@ -17,7 +20,6 @@ void handleSignal(int signalNum) {
 
 void registerSignalHandlers() {
     signal(SIGTERM, handleSignal);
-    signal(SIGKILL, handleSignal);
     signal(SIGABRT, handleSignal);
     signal(SIGSEGV, handleSignal);
     signal(SIGBUS, handleSignal);
@@ -30,16 +32,8 @@ int main(int argc, char **argv) {
     registerSignalHandlers();
 
     const auto hostnames = Utils::readHostFile(FLAGS_hostfile);
-    const auto currentHostname = NetworkUtils::getCurrentHostname();
-    const auto peerHostnames = Utils::getPeerContainerHostnames(hostnames, currentHostname);
-    const auto currentProcessIdentifier = Utils::getProcessIdentifier(hostnames, currentHostname);
-    const auto recipientIdMap = [&]() {
-        std::unordered_map<int, std::string> mapping;
-        for (const auto &hostname : hostnames) {
-            const auto recipientId = Utils::getProcessIdentifier(hostnames, hostname);
-            mapping[recipientId] = hostname;
-        }
-        return mapping;
-    }();
+    auto service = MembershipService(MEMBERSHIP_PORT, HEARTBEAT_PORT, hostnames);
+    std::thread serviceThread([&]() { service.start(); });
+    serviceThread.join();
     return 0;
 }

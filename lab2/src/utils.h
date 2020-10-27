@@ -18,8 +18,7 @@ namespace lab2 {
         static std::vector<std::string> getPeerContainerHostnames(const std::vector<std::string> &allHostnames,
                                                                   const std::string &currentHostname);
 
-        static uint32_t getProcessIdentifier(const std::vector<std::string> &allHostnames,
-                                             const std::string &hostname);
+        static uint32_t getProcessIdentifier(const std::string &hostname, const std::vector<std::string> &allHostnames);
 
         static double getRandomNumber(double min = 0, double max = 1);
     };

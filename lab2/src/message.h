@@ -23,8 +23,8 @@ namespace lab2 {
         REQUEST = 1,
         OK = 2,
         NEW_VIEW = 3,
-        HEARTBEAT = 4,
-        NEW_LEADER = 5
+        NEW_LEADER = 4,
+        HEARTBEAT = 5,
     };
 
     // OperationType and OperationTypeEnum are declared separately to facilitate serialization and deserialization
@@ -58,15 +58,15 @@ namespace lab2 {
 
     typedef struct {
         MsgType msgType; // should always be equal to 4
-        PeerId peerId;
-    } HeartBeatMsg;
-
-    typedef struct {
-        MsgType msgType; // should always be equal to 5
         RequestId requestId;
         ViewId currentViewId;
         OperationType operationType; // should always be equal to 3
     } NewLeaderMsg;
+
+    typedef struct {
+        MsgType msgType; // should always be equal to 5
+        PeerId peerId;
+    } HeartBeatMsg;
 
     std::ostream &operator<<(std::ostream &o, const MsgTypeEnum &msgTypeEnum);
 

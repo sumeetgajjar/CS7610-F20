@@ -40,9 +40,10 @@ namespace lab2 {
         return sender.substr(0, sender.find('.'));
     }
 
-    Message::Message(const char *buffer, size_t n, std::string sender) : buffer(buffer),
-                                                                         n(n),
-                                                                         sender(std::move(sender)) {}
+    Message::Message(const char *buffer_, size_t n, std::string sender) : n(n),
+                                                                          sender(std::move(sender)) {
+        memcpy(buffer, buffer_, n);
+    }
 
     std::string Message::getParsedSender() const {
         return NetworkUtils::parseHostnameFromSender(sender);
@@ -166,7 +167,7 @@ namespace lab2 {
         freeaddrinfo(serverInfoList);
     }
 
-    std::pair<int, std::string> UDPReceiver::receive(char *buffer, size_t n) {
+    std::pair<size_t, std::string> UDPReceiver::receive(char *buffer, size_t n) {
         VLOG(1) << "inside receive() of UDPReceiver, port: " << portToListen;
         struct sockaddr_storage their_addr;
         socklen_t addr_len;
@@ -281,20 +282,29 @@ namespace lab2 {
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
-        sockFd = bindSocketToFd(hostname, port, hints, &serverInfoList, &serverAddrInfo);
-        CHECK(serverAddrInfo != nullptr)
-                        << ", tcp client failed to connect to host: " << hostname << ":" << port;
-        while (::connect(sockFd, serverAddrInfo->ai_addr, serverAddrInfo->ai_addrlen) == -1) {
-            LOG(ERROR) << "tcp client failed to connect to host: " << hostname << ":" << port;
-            std::this_thread::sleep_for(std::chrono::milliseconds{1000});
-            LOG(INFO) << "tcp client retrying to connect to host: " << hostname << ":" << port;
+        while (true) {
+            try {
+                sockFd = bindSocketToFd(hostname, port, hints, &serverInfoList, &serverAddrInfo);
+                CHECK(serverAddrInfo != nullptr)
+                                << ", tcp client failed to connect to host: " << hostname << ":" << port;
+                if (::connect(sockFd, serverAddrInfo->ai_addr, serverAddrInfo->ai_addrlen) == -1) {
+                    ::close(sockFd);
+                    throw std::runtime_error("cannot connect using sockFd");
+                }
+                break;
+            } catch (const std::exception &e) {
+                LOG(ERROR) << "tcp client failed to connect to host: " << hostname << ":" << port;
+                std::this_thread::sleep_for(std::chrono::milliseconds{1000});
+                LOG(INFO) << "tcp client retrying to connect to host: " << hostname << ":" << port;
+            }
         }
+
         ::freeaddrinfo(serverInfoList);
         LOG(INFO) << "tcp client created for host:" << hostname << ":" << port;
     }
 
-    const std::string &TcpClient::getHostname() const {
-        return hostname;
+    std::string TcpClient::getHostname() const {
+        return NetworkUtils::parseHostnameFromSender(hostname);
     }
 
     int TcpClient::getPort() const {
@@ -315,8 +325,8 @@ namespace lab2 {
 
     Message TcpClient::receive() {
         VLOG(1) << "inside receive() of tcp client for host: " << hostname << ":" << port;
-        char buffer[MAX_TCP_BUFFER_SIZE];
-        if (size_t numBytes = ::recv(sockFd, buffer, MAX_TCP_BUFFER_SIZE, 0);
+        char buffer[MAX_BUFFER_SIZE];
+        if (size_t numBytes = ::recv(sockFd, buffer, MAX_BUFFER_SIZE, 0);
                 numBytes == -1) {
             std::string errorMessage("error(" + std::to_string(errno) + ") occurred while receiving data from host: " +
                                      hostname + ":" + std::to_string(port));

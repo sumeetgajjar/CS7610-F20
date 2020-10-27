@@ -29,5 +29,5 @@ RUN cmake .. && make
 
 FROM ubuntu:18.04
 ENV GLOG_alsologtostderr=1
-COPY --from=buildStage /lab2/hostfile /lab2/build/lab2 ./
+COPY --from=buildStage /lab2/hostfile /lab2/build/lab2 /
 ENTRYPOINT ["/lab2"]

@@ -13,6 +13,8 @@
 namespace lab2 {
     class SerDe {
     public:
+        static MsgTypeEnum getMsgType(const Message &message);
+
         static void serializeRequestMsg(const RequestMsg &requestMsg, char *buffer);
 
         static void serializeOkMsg(const OkMsg &okMsg, char *buffer);

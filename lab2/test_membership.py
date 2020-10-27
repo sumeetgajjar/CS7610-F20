@@ -28,8 +28,8 @@ STOP_CONTAINERS_CMD = 'docker stop {CONTAINERS}'
 REMOVE_CONTAINERS_CMD = 'docker rm {CONTAINERS}'
 START_CONTAINER_CMD = "docker run --detach" \
                       " --name {HOST} --network {NETWORK_BRIDGE} --hostname {HOST}" \
-                      " -v {LOG_DIR}:/var/log/lab1 --env GLOG_log_dir=/var/log/lab1" \
-                      " sumeet-g-prj1 {VERBOSE} --hostfile /hostfile {ARGS}"
+                      " -v {LOG_DIR}:/var/log/lab2 --env GLOG_log_dir=/var/log/lab2" \
+                      " sumeet-g-prj2 {VERBOSE} --hostfile /hostfile {ARGS}"
 
 
 class ProcessInfo:
@@ -94,7 +94,8 @@ class BaseSuite(unittest.TestCase):
         return log_lines
 
     @classmethod
-    def tail_container_logs(cls, container_name: str, callback: Callable[[str], bool]) -> None:
+    def tail_container_logs(cls, container_name: str, callback: Callable[[str, ...], bool],
+                            *args, **kwargs) -> None:
         continue_tailing = True
         with subprocess.Popen(['docker', 'logs', container_name, '-f'],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
@@ -104,7 +105,7 @@ class BaseSuite(unittest.TestCase):
                     break
 
                 line = line.decode('UTF-8')
-                continue_tailing = callback(line)
+                continue_tailing = callback(line, *args, **kwargs)
 
             p.kill()
 
@@ -135,16 +136,57 @@ class BaseSuite(unittest.TestCase):
 
 
 class MembershipSuite(BaseSuite):
+    VIEW_INSTALLATION_SUBSTR = "new view installed"
 
     @classmethod
     def setUpClass(cls):
-        return super().setUpClass()
+        super().setUpClass()
 
     def setUp(self) -> None:
         self.stop_and_remove_running_containers(remove_container=True)
 
     def tearDown(self) -> None:
         self.stop_and_remove_running_containers()
+
+    def __get_app_args(self, host: str) -> Dict[str, str]:
+        return {
+            'HOST': host,
+            'NETWORK_BRIDGE': NETWORK_BRIDGE,
+            'LOG_DIR': self.get_host_log_dir(host),
+            'VERBOSE': self.get_verbose_logging_flag(),
+            'ARGS': ''
+        }
+
+    def __wait_for_view_installation(self, leader_host: str, required_view_log_count: int):
+        view_log = []
+
+        def __callback(log_line: str, view_log_count: int) -> bool:
+            if self.VIEW_INSTALLATION_SUBSTR in log_line:
+                view_log.append(log_line)
+
+            return len(view_log) != view_log_count
+
+        self.tail_container_logs(leader_host, __callback, view_log_count=required_view_log_count)
+
+    def __assert_view_installation_log(self):
+        for ix, host in enumerate(self.HOSTS):
+            expected_view_installations = len(self.HOSTS) - ix
+            actual_view_installations = sum([1 for line in self.get_container_logs(host)
+                                             if self.VIEW_INSTALLATION_SUBSTR in line])
+            logging.info(f"found {actual_view_installations} view installations for {host}")
+            self.assertEqual(expected_view_installations, actual_view_installations)
+
+    def test_case_1(self):
+
+        leader_host = self.HOSTS[0]
+        for ix, host in enumerate(self.HOSTS):
+            logging.info(f"starting container for host: {host}")
+            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host)))
+            self.assert_process_exit_status(f"{host} container run cmd", p_run)
+            logging.info("waiting for view installation")
+            self.__wait_for_view_installation(leader_host, required_view_log_count=ix + 1)
+
+        self.__assert_view_installation_log()
 
 
 if __name__ == '__main__':
