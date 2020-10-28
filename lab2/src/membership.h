@@ -14,7 +14,7 @@
 #include "message.h"
 #include "network_utils.h"
 
-#define HEARTBEAT_INTERVAL_MS 500
+#define HEARTBEAT_INTERVAL_MS 1000
 
 namespace lab2 {
     typedef std::unordered_map<std::string, PeerId> HostnameToPeerIdMap;
@@ -63,6 +63,8 @@ namespace lab2 {
         [[noreturn]] void connectToLeader();
 
         void printNewlyInstalledView();
+
+        void startSendingHeartBeat();
 
     public:
 

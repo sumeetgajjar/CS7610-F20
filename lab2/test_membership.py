@@ -213,7 +213,7 @@ class MembershipSuite(BaseSuite):
         self.__wait_for_peer_crash(leader_host, 1)
 
         # sleeping for (HEARTBEAT_INTERVAL_MS * 3) so all peers can detect the crash
-        time.sleep(1.5)
+        time.sleep(2)
 
         peers_detecting_process_crash = self.HOSTS[:-1]
         actual_process_crashes = []
@@ -235,7 +235,7 @@ class MembershipSuite(BaseSuite):
             self.__wait_for_peer_crash(leader_host, ix + 1)
 
             # sleeping for (HEARTBEAT_INTERVAL_MS * 3) so all peers can detect the crash
-            time.sleep(1.5)
+            time.sleep(2)
 
         peers_detecting_process_crash = self.HOSTS[:-1]
         actual_process_crashes = []
