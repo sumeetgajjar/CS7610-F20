@@ -9,20 +9,17 @@
 #include <vector>
 #include <bits/unordered_set.h>
 #include <set>
+#include <mutex>
 
 #include "message.h"
 #include "network_utils.h"
+
+#define HEARTBEAT_INTERVAL_MS 1000
 
 namespace lab2 {
     typedef std::unordered_map<std::string, PeerId> HostnameToPeerIdMap;
     typedef std::unordered_map<PeerId, std::string> PeerIdToHostnameMap;
     typedef std::unordered_map<PeerId, TcpClient> TcpClientMap;
-    typedef std::unordered_map<PeerId, UDPSender> UDPSendersMap;
-
-    class PeerCrashedException : public std::runtime_error {
-    public:
-        explicit PeerCrashedException(const std::string &message);
-    };
 
     class MembershipService {
         const int membershipPort;
@@ -36,11 +33,14 @@ namespace lab2 {
         PeerId leaderPeerId = 1;
         RequestId requestIdCounter = 1;
         ViewId viewId = 1;
-        std::set<PeerId> groupMembers;
+        std::recursive_mutex alivePeersMutex;
+        std::set<PeerId> alivePeers;
         TcpClientMap tcpClientMap;
         RequestMsg pendingRequest;
 
-        RequestMsg createRequestMsg(PeerId newPeerId);
+        std::set<PeerId> getGroupMembers();
+
+        RequestMsg createRequestMsg(PeerId newPeerId, OperationTypeEnum operationTypeEnum);
 
         OkMsg createOkMsg() const;
 
@@ -50,17 +50,13 @@ namespace lab2 {
 
         void sendNewViewMsg();
 
-        void waitForAddRequestMsg();
+        void waitForRequestMsg();
 
         void waitForNewViewMsg();
 
         void waitForOkMsg(PeerId peerId, RequestId expectedRequestId);
 
-        bool conflict(PeerId peerId) const;
-
-        void addPeerToMembershipList(PeerId newPeerId);
-
-        static void checkIfPeerCrashed(PeerId peerId, const Message &message);
+        void modifyGroupMembership(PeerId peerId, OperationTypeEnum operationType);
 
         [[noreturn]] void startListening();
 

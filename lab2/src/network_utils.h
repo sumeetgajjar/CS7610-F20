@@ -12,6 +12,7 @@
 #define TCP_BACKLOG_QUEUE_SIZE 20
 
 namespace lab2 {
+
     class NetworkUtils {
     public:
         static std::string getCurrentHostname();
@@ -21,6 +22,11 @@ namespace lab2 {
         static std::string getServiceNameFromSocket(sockaddr_storage *sockaddrStorage);
 
         static std::string parseHostnameFromSender(const std::string &sender);
+    };
+
+    class TransportException : public std::runtime_error {
+    public:
+        explicit TransportException(const std::string &message);
     };
 
     class Message {
@@ -43,9 +49,7 @@ namespace lab2 {
         void initSocket();
 
     public:
-        UDPSender(std::string serverHost, int serverPort);
-
-        void send(const std::string &message);
+        UDPSender(std::string serverHost, int serverPort, int retryCount = -1);
 
         void send(const char *buff, size_t size);
 
@@ -61,7 +65,7 @@ namespace lab2 {
     public:
         explicit UDPReceiver(int portToListen);
 
-        std::pair<size_t, std::string> receive(char *buffer, size_t n);
+        Message receive();
 
         void close();
     };

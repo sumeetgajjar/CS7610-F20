@@ -2,6 +2,7 @@
 import logging
 import os
 import subprocess
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Callable, Any
@@ -137,6 +138,7 @@ class BaseSuite(unittest.TestCase):
 
 class MembershipSuite(BaseSuite):
     VIEW_INSTALLATION_SUBSTR = "new view installed"
+    PROCESS_CRASHED_SUBSTR = "not reachable"
 
     @classmethod
     def setUpClass(cls):
@@ -157,18 +159,41 @@ class MembershipSuite(BaseSuite):
             'ARGS': ''
         }
 
-    def __wait_for_view_installation(self, leader_host: str, required_view_log_count: int):
+    def __wait_for_view_installation(self, host: str, required_view_log_count: int):
+        logging.debug(f"waiting for new view installation in host: {host}")
         view_log = []
 
         def __callback(log_line: str, view_log_count: int) -> bool:
             if self.VIEW_INSTALLATION_SUBSTR in log_line:
                 view_log.append(log_line)
 
-            return len(view_log) != view_log_count
+            return len(view_log) < view_log_count
 
-        self.tail_container_logs(leader_host, __callback, view_log_count=required_view_log_count)
+        self.tail_container_logs(host, __callback, view_log_count=required_view_log_count)
 
-    def __assert_view_installation_log(self):
+    def __start_all_containers(self):
+        for ix, host in enumerate(self.HOSTS):
+            logging.info(f"starting container for host: {host}")
+            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host)))
+            self.assert_process_exit_status(f"{host} container run cmd", p_run)
+            self.__wait_for_view_installation(host, required_view_log_count=1)
+
+    def __wait_for_peer_crash(self, host: str, peer_crash_count: int):
+        logging.debug(f"waiting for peer crash detection in host: {host}")
+        peer_crash_msg = []
+
+        def __call_back(log_line: str) -> bool:
+            if self.PROCESS_CRASHED_SUBSTR in log_line:
+                peer_crash_msg.append(log_line)
+
+            return len(peer_crash_msg) < peer_crash_count
+
+        self.tail_container_logs(host, __call_back)
+        logging.info(f"number of crashes detected by {host}: {len(peer_crash_msg)}")
+
+    def test_case_1(self):
+        self.__start_all_containers()
+
         for ix, host in enumerate(self.HOSTS):
             expected_view_installations = len(self.HOSTS) - ix
             actual_view_installations = sum([1 for line in self.get_container_logs(host)
@@ -176,17 +201,37 @@ class MembershipSuite(BaseSuite):
             logging.info(f"found {actual_view_installations} view installations for {host}")
             self.assertEqual(expected_view_installations, actual_view_installations)
 
-    def test_case_1(self):
-
+    def test_case_2(self):
         leader_host = self.HOSTS[0]
-        for ix, host in enumerate(self.HOSTS):
-            logging.info(f"starting container for host: {host}")
-            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host)))
-            self.assert_process_exit_status(f"{host} container run cmd", p_run)
-            logging.info("waiting for view installation")
-            self.__wait_for_view_installation(leader_host, required_view_log_count=ix + 1)
+        peer_to_stop = self.HOSTS[-1]
 
-        self.__assert_view_installation_log()
+        self.__start_all_containers()
+        logging.info(f"stopping peer: {peer_to_stop}")
+        p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_stop))
+        self.assert_process_exit_status("stop peer cmd", p_stop)
+        logging.info("waiting for peer crashed messages")
+        self.__wait_for_peer_crash(leader_host, 1)
+
+        actual_process_crashes = []
+        for host in self.HOSTS[:-1]:
+            actual_process_crashes.append(sum([1 for line in self.get_container_logs(host)
+                                               if self.PROCESS_CRASHED_SUBSTR in line]))
+
+        self.assertListEqual([1] * (len(self.HOSTS) - 1), actual_process_crashes, f"process crash count mismatch")
+
+    def test_case_3(self):
+        leader_host = self.HOSTS[0]
+        self.__start_all_containers()
+        for ix, peer_to_stop in enumerate(reversed(self.HOSTS[1:])):
+            logging.info(f"stopping peer: {peer_to_stop}")
+            p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_stop))
+            self.assert_process_exit_status("stop peer cmd", p_stop)
+            logging.info("waiting for peer crashed messages")
+            self.__wait_for_peer_crash(leader_host, ix + 1)
+
+        actual_process_crashes = sum([1 for line in self.get_container_logs(leader_host)
+                                      if self.PROCESS_CRASHED_SUBSTR in line])
+        self.assertEqual(len(self.HOSTS) - 1, actual_process_crashes)
 
 
 if __name__ == '__main__':

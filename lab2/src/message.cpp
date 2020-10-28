@@ -31,11 +31,11 @@ namespace lab2 {
                 case NOTHING:
                     return "Nothing";
                 case ADD:
-                    return "Add";
+                    return "AddOperation";
                 case DEL:
-                    return "Del";
+                    return "DelOperation";
                 case PENDING:
-                    return "Pending";
+                    return "PendingOperation";
                 default:
                     throw std::runtime_error("unknown operation type: " + std::to_string(operationTypeEnum));
             }

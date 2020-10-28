@@ -33,7 +33,6 @@ int main(int argc, char **argv) {
 
     const auto hostnames = Utils::readHostFile(FLAGS_hostfile);
     auto service = MembershipService(MEMBERSHIP_PORT, HEARTBEAT_PORT, hostnames);
-    std::thread serviceThread([&]() { service.start(); });
-    serviceThread.join();
+    service.start();
     return 0;
 }

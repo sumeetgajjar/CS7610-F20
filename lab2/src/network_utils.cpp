@@ -7,6 +7,8 @@
 
 namespace lab2 {
 
+    TransportException::TransportException(const std::string &message) : std::runtime_error(message) {}
+
     std::string NetworkUtils::getCurrentHostname() {
         VLOG(1) << "getting current host";
         char hostname[HOST_NAME_MAX];
@@ -49,15 +51,18 @@ namespace lab2 {
         return NetworkUtils::parseHostnameFromSender(sender);
     }
 
-    UDPSender::UDPSender(std::string serverHost, int serverPort) : serverHost(std::move(serverHost)),
-                                                                   serverPort(serverPort) {
+    UDPSender::UDPSender(std::string serverHost, int serverPort, int retryCount) : serverHost(std::move(serverHost)),
+                                                                                   serverPort(serverPort) {
         VLOG(1) << "creating UDPSender for hostname: " << this->serverHost << ":" << this->serverPort;
-        while (true) {
+        for (int i = 0; i <= retryCount; i++) {
             try {
                 initSocket();
                 break;
             } catch (std::runtime_error &e) {
-                LOG(ERROR) << "UDPSender creation error: " << e.what();
+                VLOG(1) << "UDPSender creation error: " << e.what();
+                if (i >= retryCount) {
+                    throw e;
+                }
                 std::this_thread::sleep_for(std::chrono::seconds{2});
             }
         }
@@ -83,26 +88,12 @@ namespace lab2 {
                 LOG(ERROR) << "error in creating sender socket";
                 continue;
             }
-            LOG(INFO) << "sender socket created for hostname: " << serverHost << ", port:" << serverPort;
+            VLOG(1) << "sender socket created for hostname: " << serverHost << ", port:" << serverPort;
             break;
         }
 
         CHECK(serverAddrInfo != nullptr) << ", failed to create sender socket for host: "
                                          << serverHost << ":" << serverPort;
-    }
-
-    void UDPSender::send(const std::string &message) {
-        VLOG(1) << "inside send() of UDPSender, host: " << serverHost << ":" << serverPort
-                << " ,message: " << message;
-        if (int numbytes = sendto(sendFD, message.c_str(), message.size(), 0, serverAddrInfo->ai_addr,
-                                  serverAddrInfo->ai_addrlen);
-                numbytes == -1) {
-            LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
-                       << ", message: " << message << ", errno: " << errno;
-        } else {
-            VLOG(1) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
-                    << ", message: " << message;
-        }
     }
 
     void UDPSender::send(const char *buff, size_t size) {
@@ -111,8 +102,11 @@ namespace lab2 {
         if (ssize_t numbytes = sendto(sendFD, buff, size, 0, serverAddrInfo->ai_addr,
                                       serverAddrInfo->ai_addrlen);
                 numbytes == -1) {
-            LOG(ERROR) << "error occurred while sending, host:" << serverHost << ":" << serverPort
-                       << ", buffer size: " << size << ", errno: " << errno;
+            std::stringstream ss;
+            ss << "error occurred while sending, host:" << serverHost << ":" << serverPort
+               << ", buffer size: " << size << ", errno: " << errno;
+            LOG(ERROR) << ss.str();
+            throw TransportException(ss.str());
         } else {
             VLOG(1) << "UDP send to host: " << serverHost << ":" << serverPort << ", bytes: " << numbytes
                     << ", buffer size: " << size;
@@ -120,7 +114,7 @@ namespace lab2 {
     }
 
     void UDPSender::close() {
-        LOG(INFO) << "closing UDPSender for host: " << serverHost << ":" << serverPort;
+        VLOG(1) << "closing UDPSender for host: " << serverHost << ":" << serverPort;
         freeaddrinfo(serverInfoList);
         int rv = ::close(sendFD);
         LOG_IF(ERROR, rv != 0)
@@ -159,7 +153,7 @@ namespace lab2 {
                 continue;
             }
 
-            LOG(INFO) << "receiver socket created";
+            VLOG(1) << "receiver socket created";
             break;
         }
 
@@ -167,28 +161,28 @@ namespace lab2 {
         freeaddrinfo(serverInfoList);
     }
 
-    std::pair<size_t, std::string> UDPReceiver::receive(char *buffer, size_t n) {
+    Message UDPReceiver::receive() {
         VLOG(1) << "inside receive() of UDPReceiver, port: " << portToListen;
         struct sockaddr_storage their_addr;
         socklen_t addr_len;
         addr_len = sizeof(their_addr);
-
+        char buffer[MAX_BUFFER_SIZE];
         VLOG(1) << "waiting for message";
-        if (ssize_t numbytes = recvfrom(recvFD, buffer, n, 0, (struct sockaddr *) &their_addr,
+        if (ssize_t numBytes = recvfrom(recvFD, buffer, MAX_BUFFER_SIZE, 0, (struct sockaddr *) &their_addr,
                                         &addr_len);
-                numbytes == -1) {
+                numBytes == -1) {
             std::string errorMessage("error(" + std::to_string(errno) + ") occurred while receiving data");
             LOG(ERROR) << errorMessage;
-            throw std::runtime_error(errorMessage);
+            throw TransportException(errorMessage);
         } else {
             std::string receivedFrom = NetworkUtils::getHostnameFromSocket(&their_addr);
-            VLOG(1) << "received:" << numbytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
-            return std::make_pair(numbytes, receivedFrom);
+            VLOG(1) << "received:" << numBytes << " bytes, on port: " << portToListen << ", from: " << receivedFrom;
+            return Message(buffer, numBytes, receivedFrom);
         }
     }
 
     void UDPReceiver::close() {
-        LOG(INFO) << "closing UDPReceiver on port: " << portToListen;
+        VLOG(1) << "closing UDPReceiver on port: " << portToListen;
         int rv = ::close(recvFD);
         LOG_IF(ERROR, rv != 0) << ", error: " << errno
                                << ", while closing UDPReceiver on port: " << portToListen;
@@ -214,7 +208,7 @@ namespace lab2 {
                 continue;
             }
             *serverAddrInfo = p;
-            LOG(INFO) << "sender socket created for hostname: " << hostname << ", port:" << port;
+            VLOG(1) << "sender socket created for hostname: " << hostname << ", port:" << port;
             break;
         }
 
@@ -224,7 +218,7 @@ namespace lab2 {
     }
 
     TcpServer::TcpServer(const int listeningPort) : listeningPort(listeningPort) {
-        LOG(INFO) << "creating tcp server on port: " << listeningPort;
+        VLOG(1) << "creating tcp server on port: " << listeningPort;
         initSocket();
     }
 
@@ -252,18 +246,18 @@ namespace lab2 {
     }
 
     TcpClient TcpServer::accept() const {
-        LOG(INFO) << "waiting for connections on port: " << listeningPort;
+        VLOG(1) << "waiting for connections on port: " << listeningPort;
         struct sockaddr_storage clientAddr;
         socklen_t sin_size = sizeof(clientAddr);
         int clientFd = ::accept(sockFd, (struct sockaddr *) &clientAddr, &sin_size);
         const std::string clientHostname = NetworkUtils::getHostnameFromSocket(&clientAddr);
         const int clientPort = std::stoi(NetworkUtils::getServiceNameFromSocket(&clientAddr));
-        LOG(INFO) << "received incoming connection from " << clientHostname << ":" << clientPort;
+        VLOG(1) << "received incoming connection from " << clientHostname << ":" << clientPort;
         return TcpClient(clientHostname, clientPort, clientFd);
     }
 
     void TcpServer::close() {
-        LOG(INFO) << "closing tcp server on port: " << listeningPort;
+        VLOG(1) << "closing tcp server on port: " << listeningPort;
         ::close(sockFd);
     }
 
@@ -271,7 +265,7 @@ namespace lab2 {
     TcpClient::TcpClient(std::string hostname_, const int port, const int fd) : hostname(std::move(hostname_)),
                                                                                 port(port),
                                                                                 sockFd(fd) {
-        LOG(INFO) << "tcp client created for host:" << hostname << ":" << port;
+        VLOG(1) << "tcp client created for host:" << hostname << ":" << port;
         LOG_IF(FATAL, hostname.empty()) << "hostname cannot be empty";
     }
 
@@ -295,12 +289,12 @@ namespace lab2 {
             } catch (const std::exception &e) {
                 LOG(ERROR) << "tcp client failed to connect to host: " << hostname << ":" << port;
                 std::this_thread::sleep_for(std::chrono::milliseconds{1000});
-                LOG(INFO) << "tcp client retrying to connect to host: " << hostname << ":" << port;
+                VLOG(1) << "tcp client retrying to connect to host: " << hostname << ":" << port;
             }
         }
 
         ::freeaddrinfo(serverInfoList);
-        LOG(INFO) << "tcp client created for host:" << hostname << ":" << port;
+        VLOG(1) << "tcp client created for host:" << hostname << ":" << port;
     }
 
     std::string TcpClient::getHostname() const {
@@ -313,12 +307,15 @@ namespace lab2 {
 
     void TcpClient::send(const char *buff, size_t size) {
         VLOG(1) << "inside send() of tcp client for host: " << hostname << ":" << port;
-        if (ssize_t numbytes = ::send(sockFd, buff, size, 0);
-                numbytes == -1) {
-            LOG(ERROR) << "error occurred while sending, host:" << hostname << ":" << port
-                       << ", buffer size: " << size << ", errno: " << errno;
+        if (ssize_t numBytes = ::send(sockFd, buff, size, 0);
+                numBytes == -1) {
+            std::stringstream ss;
+            ss << "error occurred while sending, host:" << hostname << ":" << port
+               << ", buffer size: " << size << ", errno: " << errno;
+            LOG(ERROR) << ss.str();
+            throw TransportException(ss.str());
         } else {
-            VLOG(1) << "tcp client send to host: " << hostname << ":" << port << ", bytes: " << numbytes
+            VLOG(1) << "tcp client send to host: " << hostname << ":" << port << ", bytes: " << numBytes
                     << ", buffer size: " << size;
         }
     }
@@ -331,7 +328,9 @@ namespace lab2 {
             std::string errorMessage("error(" + std::to_string(errno) + ") occurred while receiving data from host: " +
                                      hostname + ":" + std::to_string(port));
             LOG(ERROR) << errorMessage;
-            throw std::runtime_error(errorMessage);
+            throw TransportException(errorMessage);
+        } else if (numBytes == 0) {
+            throw TransportException("host: " + hostname + " crashed");
         } else {
             VLOG(1) << "received:" << numBytes << " bytes, from host: " << hostname << ":" << port;
             return Message(buffer, numBytes, hostname);
@@ -339,7 +338,7 @@ namespace lab2 {
     }
 
     void TcpClient::close() {
-        LOG(INFO) << "closing tcp client for host: " << hostname << ":" << port;
+        VLOG(1) << "closing tcp client for host: " << hostname << ":" << port;
         ::close(sockFd);
     }
 }
