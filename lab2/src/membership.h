@@ -14,7 +14,7 @@
 #include "message.h"
 #include "network_utils.h"
 
-#define HEARTBEAT_INTERVAL_MS 1000
+#define HEARTBEAT_INTERVAL_MS 500
 
 namespace lab2 {
     typedef std::unordered_map<std::string, PeerId> HostnameToPeerIdMap;

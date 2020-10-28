@@ -175,6 +175,8 @@ namespace lab2 {
 
             // removing the peer from the alive list since it is not reachable
             if (operationType == OperationTypeEnum::DEL) {
+                tcpClientMap.at(peerId).close();
+                tcpClientMap.erase(peerId);
                 alivePeers.erase(peerId);
                 LOG(INFO) << "removed peerId: " << peerId << " from the group"
                           << ", GroupSize: " << getGroupMembers().size();
@@ -241,8 +243,11 @@ namespace lab2 {
 #pragma ide diagnostic ignored "EndlessLoop"
 
     void MembershipService::start() {
+        std::set<PeerId> heartBeatReceivers;
+        std::mutex heartBeatReceiversMutex;
         std::unordered_set<PeerId> peerHeartBeatSet;
         std::mutex peerHeartBeatSetMutex;
+
         std::thread heartBeatReceiverThread([&]() {
             VLOG(1) << "starting HeartBeatReceiver thread";
             UDPReceiver udpReceiver(heartBeatPort);
@@ -267,27 +272,27 @@ namespace lab2 {
                 VLOG(1) << "heartbeat monitor thread sleeping for " << HEARTBEAT_INTERVAL_MS << " ms";
                 std::this_thread::sleep_for(std::chrono::milliseconds{HEARTBEAT_INTERVAL_MS});
                 {
-                    std::scoped_lock<std::recursive_mutex, std::mutex> scopedLock(alivePeersMutex,
-                                                                                  peerHeartBeatSetMutex);
-                    for (const auto &member : alivePeers) {
-                        if (peerHeartBeatSet.find(member) != peerHeartBeatSet.end()) {
+                    std::scoped_lock<std::mutex, std::mutex> scopedLock(heartBeatReceiversMutex,
+                                                                        peerHeartBeatSetMutex);
+                    for (const auto &heartBeatReceiver : heartBeatReceivers) {
+                        if (peerHeartBeatSet.find(heartBeatReceiver) != peerHeartBeatSet.end()) {
                             // If heartBeat exists in the set then clear it for the next monitor check
-                            peerHeartBeatSet.erase(member);
-                            heartBeatMissedCount.erase(member);
+                            peerHeartBeatSet.erase(heartBeatReceiver);
+                            heartBeatMissedCount.erase(heartBeatReceiver);
                         } else {
                             // If heartBeat not found then increment the missed count
-                            heartBeatMissedCount[member]++;
-                            if (heartBeatMissedCount[member] == 3) {
-                                LOG(WARNING) << "Peer " << member << " not reachable";
-                                tcpClientMap.erase(member);
+                            heartBeatMissedCount[heartBeatReceiver]++;
+                            if (heartBeatMissedCount[heartBeatReceiver] == 2) {
+                                heartBeatReceivers.erase(heartBeatReceiver);
+                                LOG(WARNING) << "Peer " << heartBeatReceiver << " not reachable";
                                 if (myPeerId == leaderPeerId) {
-                                    modifyGroupMembership(member, OperationTypeEnum::DEL);
-                                } else if (member == leaderPeerId) {
-                                    LOG(WARNING) << "Leader " << member << " has crashed";
+                                    modifyGroupMembership(heartBeatReceiver, OperationTypeEnum::DEL);
+                                } else if (heartBeatReceiver == leaderPeerId) {
+                                    LOG(WARNING) << "Leader " << heartBeatReceiver << " has crashed";
                                     //TODO implement this
                                 }
                                 // breaking out of the loop since the iterator is invalidated due to modification
-                                // of alivePeers set.
+                                // of heartBeatReceivers set.
                                 // iterating using invalidated iterator results in undefined behavior
                                 break;
                             }
@@ -308,18 +313,20 @@ namespace lab2 {
             while (true) {
                 {
                     std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
-                    VLOG(1) << "sending HeartBeat message, alivePeerSize: " << alivePeers.size();
-                    for (const auto &member : alivePeers) {
-                        VLOG(1) << "sending HeartBeatMsg to peerId: " << member << ", msg: " << msg;
-                        try {
-                            auto udpSender = UDPSender(peerIdToHostnameMap.at(member), heartBeatPort, 0);
-                            udpSender.send(buffer, sizeof(HeartBeatMsg));
-                            udpSender.close();
-                        } catch (std::runtime_error &e) {
-                            VLOG(1) << "exception occured while sending heartbeat msg to peerId: " << member;
-                        }
+                    heartBeatReceivers.insert(alivePeers.begin(), alivePeers.end());
+                }
+                VLOG(1) << "sending HeartBeat message, heartBeatReceiversSize: " << heartBeatReceivers.size();
+                for (const auto &member : heartBeatReceivers) {
+                    VLOG(1) << "sending HeartBeatMsg to peerId: " << member << ", msg: " << msg;
+                    try {
+                        auto udpSender = UDPSender(peerIdToHostnameMap.at(member), heartBeatPort, 0);
+                        udpSender.send(buffer, sizeof(HeartBeatMsg));
+                        udpSender.close();
+                    } catch (std::runtime_error &e) {
+                        VLOG(1) << "exception occured while sending heartbeat msg to peerId: " << member;
                     }
                 }
+
                 VLOG(1) << "heartbeat sender sleeping for " << HEARTBEAT_INTERVAL_MS << " ms";
                 std::this_thread::sleep_for(std::chrono::milliseconds{HEARTBEAT_INTERVAL_MS});
             }

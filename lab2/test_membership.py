@@ -203,35 +203,48 @@ class MembershipSuite(BaseSuite):
 
     def test_case_2(self):
         leader_host = self.HOSTS[0]
-        peer_to_stop = self.HOSTS[-1]
+        peer_to_crash = self.HOSTS[-1]
 
         self.__start_all_containers()
-        logging.info(f"stopping peer: {peer_to_stop}")
-        p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_stop))
-        self.assert_process_exit_status("stop peer cmd", p_stop)
+        logging.info(f"crashing peer: {peer_to_crash}")
+        p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_crash))
+        self.assert_process_exit_status("crash peer cmd", p_stop)
         logging.info("waiting for peer crashed messages")
         self.__wait_for_peer_crash(leader_host, 1)
 
+        # sleeping for (HEARTBEAT_INTERVAL_MS * 3) so all peers can detect the crash
+        time.sleep(1.5)
+
+        peers_detecting_process_crash = self.HOSTS[:-1]
         actual_process_crashes = []
-        for host in self.HOSTS[:-1]:
+        for host in peers_detecting_process_crash:
             actual_process_crashes.append(sum([1 for line in self.get_container_logs(host)
                                                if self.PROCESS_CRASHED_SUBSTR in line]))
 
-        self.assertListEqual([1] * (len(self.HOSTS) - 1), actual_process_crashes, f"process crash count mismatch")
+        expected_process_crashes = [1 for _ in peers_detecting_process_crash]
+        self.assertListEqual(expected_process_crashes, actual_process_crashes, f"process crash count mismatch")
 
     def test_case_3(self):
         leader_host = self.HOSTS[0]
         self.__start_all_containers()
         for ix, peer_to_stop in enumerate(reversed(self.HOSTS[1:])):
-            logging.info(f"stopping peer: {peer_to_stop}")
+            logging.info(f"crashing peer: {peer_to_stop}")
             p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_stop))
-            self.assert_process_exit_status("stop peer cmd", p_stop)
+            self.assert_process_exit_status("crash peer cmd", p_stop)
             logging.info("waiting for peer crashed messages")
             self.__wait_for_peer_crash(leader_host, ix + 1)
 
-        actual_process_crashes = sum([1 for line in self.get_container_logs(leader_host)
-                                      if self.PROCESS_CRASHED_SUBSTR in line])
-        self.assertEqual(len(self.HOSTS) - 1, actual_process_crashes)
+            # sleeping for (HEARTBEAT_INTERVAL_MS * 3) so all peers can detect the crash
+            time.sleep(1.5)
+
+        peers_detecting_process_crash = self.HOSTS[:-1]
+        actual_process_crashes = []
+        for host in peers_detecting_process_crash:
+            actual_process_crashes.append(sum([1 for line in self.get_container_logs(host)
+                                               if self.PROCESS_CRASHED_SUBSTR in line]))
+
+        expected_process_crashes = list(reversed(range(1, len(self.HOSTS))))
+        self.assertListEqual(expected_process_crashes, actual_process_crashes)
 
 
 if __name__ == '__main__':
