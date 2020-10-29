@@ -238,9 +238,6 @@ namespace lab2 {
         LOG(INFO) << "new view installed, viewId: " << viewId << ", members: " << ss.str();
     }
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "EndlessLoop"
-
     void MembershipService::startSendingHeartBeat() {
         VLOG(1) << "starting sending heartBeat";
         for (const auto &pair : hostnameToPeerIdMap) {
@@ -272,6 +269,9 @@ namespace lab2 {
             }).detach();
         }
     }
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "EndlessLoop"
 
     void MembershipService::start() {
         startSendingHeartBeat();
