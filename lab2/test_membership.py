@@ -203,7 +203,7 @@ class MembershipSuite(BaseSuite):
         actual_view_installations = []
         for ix, host in enumerate(self.HOSTS):
             actual_view_installations.append(sum([1 for line in self.get_container_logs(host)
-                                                  if self.NEW_VIEW_DELIVERY_SUBSTR in line]))
+                                                  if self.NEW_VIEW_INSTALLED_SUBSTR in line]))
 
         expected_view_installations = list(reversed(range(1, len(self.HOSTS) + 1)))
         self.assertListEqual(expected_view_installations, actual_view_installations)
