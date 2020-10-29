@@ -200,12 +200,13 @@ class MembershipSuite(BaseSuite):
     def test_case_1(self):
         self.__start_all_containers()
 
+        actual_view_installations = []
         for ix, host in enumerate(self.HOSTS):
-            expected_view_installations = len(self.HOSTS) - ix
-            actual_view_installations = sum([1 for line in self.get_container_logs(host)
-                                             if self.NEW_VIEW_DELIVERY_SUBSTR in line])
-            logging.info(f"found {actual_view_installations} view installations for {host}")
-            self.assertEqual(expected_view_installations, actual_view_installations)
+            actual_view_installations.append(sum([1 for line in self.get_container_logs(host)
+                                                  if self.NEW_VIEW_DELIVERY_SUBSTR in line]))
+
+        expected_view_installations = list(reversed(range(1, len(self.HOSTS) + 1)))
+        self.assertListEqual(expected_view_installations, actual_view_installations)
 
     def test_case_2(self):
         leader_host = self.HOSTS[0]
