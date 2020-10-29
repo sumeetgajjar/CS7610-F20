@@ -150,13 +150,13 @@ class MembershipSuite(BaseSuite):
     def tearDown(self) -> None:
         self.stop_and_remove_running_containers()
 
-    def __get_app_args(self, host: str) -> Dict[str, str]:
+    def __get_app_args(self, host: str, is_test_case_4: bool) -> Dict[str, str]:
         return {
             'HOST': host,
             'NETWORK_BRIDGE': NETWORK_BRIDGE,
             'LOG_DIR': self.get_host_log_dir(host),
             'VERBOSE': self.get_verbose_logging_flag(),
-            'ARGS': ''
+            'ARGS': '--leaderFailureDemo' if is_test_case_4 else ''
         }
 
     def __wait_for_view_installation(self, host: str, required_view_log_count: int):
@@ -171,10 +171,10 @@ class MembershipSuite(BaseSuite):
 
         self.tail_container_logs(host, __callback, view_log_count=required_view_log_count)
 
-    def __start_all_containers(self):
+    def __start_all_containers(self, is_test_case_4: bool = False):
         for ix, host in enumerate(self.HOSTS):
             logging.info(f"starting container for host: {host}")
-            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host)))
+            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host, is_test_case_4)))
             self.assert_process_exit_status(f"{host} container run cmd", p_run)
             self.__wait_for_view_installation(host, required_view_log_count=1)
 
@@ -244,6 +244,37 @@ class MembershipSuite(BaseSuite):
                                                if self.PROCESS_CRASHED_SUBSTR in line]))
 
         expected_process_crashes = list(reversed(range(1, len(self.HOSTS))))
+        self.assertListEqual(expected_process_crashes, actual_process_crashes)
+
+    def test_case_4(self):
+        initial_leader_host = self.HOSTS[0]
+        new_leader_host = self.HOSTS[0]
+        peer_to_stop = self.HOSTS[-1]
+        self.__start_all_containers(is_test_case_4=True)
+        p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_stop))
+        self.assert_process_exit_status("crash peer cmd", p_stop)
+
+        # Wait for the initial leader to crash
+        self.tail_container_logs(initial_leader_host,
+                                 lambda log_line: "crashing Leader purposefully for TestCase 4" not in log_line)
+
+        # Wait for the new leader to detect 2 crashes
+        self.__wait_for_peer_crash(new_leader_host, 2)
+        # waiting for new view installation
+        self.__wait_for_view_installation(new_leader_host, 5)
+
+        actual_process_crashes = []
+        for host in self.HOSTS:
+            actual_process_crashes.append(sum([1 for line in self.get_container_logs(host)
+                                               if self.VIEW_INSTALLATION_SUBSTR in line]))
+
+        # If there 5 peers, then expected view installations in peers P[1-5] by initial leader: [5,4,3,2,1]
+        # view installation in peers p[1-5] by new leader: [0,1,1,1,0]
+        # total view installations: [5,5,4,3,1]
+        expected_process_crashes = list(reversed(range(1, len(self.HOSTS) + 1)))
+        for ix in range(1, len(self.HOSTS)):
+            expected_process_crashes[ix] += 1
+
         self.assertListEqual(expected_process_crashes, actual_process_crashes)
 
 

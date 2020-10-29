@@ -287,7 +287,7 @@ namespace lab2 {
                     throw std::runtime_error("cannot connect using sockFd");
                 }
                 break;
-            } catch (const std::exception &e) {
+            } catch (const std::runtime_error &e) {
                 LOG(ERROR) << "tcp client failed to connect to host: " << hostname << ":" << port;
                 if (i >= retryCount) {
                     throw e;

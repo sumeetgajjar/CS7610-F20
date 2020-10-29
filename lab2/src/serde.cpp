@@ -60,7 +60,7 @@ namespace lab2 {
 
     RequestMsg SerDe::deserializeRequestMsg(const Message &message) {
         VLOG(1) << "deserializing RequestMsg from sender: " << message.sender;
-        CHECK(sizeof(RequestMsg) == message.n) << ", buffer size does not match RequestMsg size";
+        CHECK(sizeof(RequestMsg) == message.n) << ", buffer size does not match RequestMsg size: " << message.n;
         const auto *ptr = reinterpret_cast<const RequestMsg *>(message.buffer);
         RequestMsg msg;
         msg.msgType = ::ntohl(ptr->msgType);
@@ -73,7 +73,7 @@ namespace lab2 {
 
     OkMsg SerDe::deserializeOkMsg(const Message &message) {
         VLOG(1) << "deserializing OkMsg from sender: " << message.sender;
-        CHECK(sizeof(OkMsg) == message.n) << ", buffer size does not match RequestMsg size";
+        CHECK(sizeof(OkMsg) == message.n) << ", buffer size does not match OkMsg size: " << message.n;
         auto *ptr = reinterpret_cast<const OkMsg *>(message.buffer);
         OkMsg msg;
         msg.msgType = ::ntohl(ptr->msgType);
@@ -84,7 +84,7 @@ namespace lab2 {
 
     NewViewMsg SerDe::deserializeNewViewMsg(const Message &message) {
         VLOG(1) << "deserializing NewViewMsg from sender: " << message.sender;
-        CHECK(sizeof(NewViewMsg) == message.n) << ", buffer size does not match RequestMsg size";
+        CHECK(sizeof(NewViewMsg) == message.n) << ", buffer size does not match NewViewMsg size: " << message.n;
         auto *ptr = reinterpret_cast<const NewViewMsg *>(message.buffer);
         NewViewMsg msg;
         msg.msgType = ::ntohl(ptr->msgType);
@@ -98,7 +98,7 @@ namespace lab2 {
 
     HeartBeatMsg SerDe::deserializeHeartBeatMsg(const Message &message) {
         VLOG(1) << "deserializing HeartBeatMsg from sender: " << message.sender;
-        CHECK(sizeof(HeartBeatMsg) == message.n) << ", buffer size does not match RequestMsg size";
+        CHECK(sizeof(HeartBeatMsg) == message.n) << ", buffer size does not match HeartBeatMsg size: " << message.n;
         auto *ptr = reinterpret_cast<const HeartBeatMsg *>(message.buffer);
         HeartBeatMsg msg;
         msg.msgType = ::ntohl(ptr->msgType);
@@ -108,7 +108,7 @@ namespace lab2 {
 
     NewLeaderMsg SerDe::deserializeNewLeaderMsg(const Message &message) {
         VLOG(1) << "deserializing NewLeaderMsg from sender: " << message.sender;
-        CHECK(sizeof(NewLeaderMsg) == message.n) << ", buffer size does not match RequestMsg size";
+        CHECK(sizeof(NewLeaderMsg) == message.n) << ", buffer size does not match NewLeaderMsg size: " << message.n;
         auto *ptr = reinterpret_cast<const NewLeaderMsg *>(message.buffer);
         NewLeaderMsg msg;
         msg.msgType = ::ntohl(ptr->msgType);

@@ -10,7 +10,7 @@
 
 namespace lab2 {
 
-    RequestMsg getEmptyPendingRequestMsg() {
+    RequestMsg getDummyPendingRequestMsg() {
         RequestMsg requestMsg;
         requestMsg.msgType = MsgTypeEnum::REQUEST;
         requestMsg.requestId = 0;
@@ -18,14 +18,6 @@ namespace lab2 {
         requestMsg.operationType = OperationTypeEnum::NOTHING;
         requestMsg.peerId = 0;
         return requestMsg;
-    }
-
-    bool isRequestPending(const RequestMsg &requestMsg) {
-        return requestMsg.msgType == MsgTypeEnum::REQUEST &&
-               requestMsg.requestId == 0 &&
-               requestMsg.currentViewId == 0 &&
-               requestMsg.operationType == OperationTypeEnum::NOTHING &&
-               requestMsg.peerId == 0;
     }
 
     MembershipService::MembershipService(const int membershipPort, const int heartBeatPort,
@@ -44,7 +36,7 @@ namespace lab2 {
         myPeerId = hostnameToPeerIdMap.at(currentHostname);
         LOG(INFO) << "myPeerId: " << myPeerId;
 
-        pendingRequest = getEmptyPendingRequestMsg();
+        pendingRequest = getDummyPendingRequestMsg();
     }
 
     std::set<PeerId> MembershipService::getGroupMembers() {
@@ -87,13 +79,21 @@ namespace lab2 {
         LOG(INFO) << "sending RequestMsg: " << requestMsg;
         char buffer[sizeof(RequestMsg)];
         SerDe::serializeRequestMsg(requestMsg, buffer);
-
         std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
+        bool isTestCase4 = FLAGS_leaderFailureDemo && requestMsg.operationType == OperationTypeEnum::DEL;
         for (const auto peerId: alivePeers) {
+            // Special if stmt to demo TestCase 4
+            if (isTestCase4 && peerId == 2) {
+                continue;
+            }
             auto tcpClient = tcpClientMap.at(peerId);
             tcpClient.send(buffer, sizeof(RequestMsg));
         }
         VLOG(1) << "requestMsg sent";
+        if (isTestCase4) {
+            LOG(WARNING) << "crashing Leader purposefully for TestCase 4";
+            exit(0);
+        }
     }
 
     void MembershipService::sendOkMsg(const OkMsg &okMsg) {
@@ -134,9 +134,6 @@ namespace lab2 {
         VLOG(1) << "inside sendPendingRequestMsg";
         auto requestMsg = pendingRequest;
         requestMsg.currentViewId = viewId;
-        if (!isRequestPending(requestMsg)) {
-            requestMsg.operationType = OperationTypeEnum::NOTHING;
-        }
         VLOG(1) << "sending pendingRequestMsg: " << pendingRequest << ", to leaderPeerId: " << leaderPeerId;
         char buffer[sizeof(RequestMsg)];
         SerDe::serializeRequestMsg(requestMsg, buffer);
@@ -152,7 +149,7 @@ namespace lab2 {
         for (const auto &peer : alivePeers) {
             try {
                 VLOG(1) << "sending newLeaderMsg: " << newLeaderMsg << ", to peerId: " << peer;
-                auto client = TcpClient(peerIdToHostnameMap.at(peer), membershipPort, 10);
+                auto client = TcpClient(peerIdToHostnameMap.at(peer), membershipPort, 5);
                 client.send(buffer, sizeof(NewLeaderMsg));
                 tcpClientMap.insert(std::make_pair(peer, client));
             } catch (const std::runtime_error &e) {
@@ -196,6 +193,7 @@ namespace lab2 {
 
         auto msgTypeEnum = SerDe::getMsgType(rawNewViewMessage);
         LOG(INFO) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
+        CHECK_EQ(msgTypeEnum, MsgTypeEnum::NEW_VIEW);
 
         auto newViewMsg = SerDe::deserializeNewViewMsg(rawNewViewMessage);
         LOG(INFO) << "received newViewMsg: " << newViewMsg << ", from leader: " << leaderPeerId;
@@ -209,7 +207,7 @@ namespace lab2 {
             }
             alivePeers.erase(myPeerId);
         }
-        pendingRequest = getEmptyPendingRequestMsg();
+        pendingRequest = getDummyPendingRequestMsg();
         printNewlyInstalledView();
     }
 
@@ -234,7 +232,7 @@ namespace lab2 {
     RequestMsg MembershipService::waitForPendingRequestMsg() {
         VLOG(1) << "inside waitForPendingRequestMsg";
         std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
-        RequestMsg pendingRequestMsg = getEmptyPendingRequestMsg();
+        RequestMsg pendingRequestMsg = getDummyPendingRequestMsg();
         for (const auto &peer : alivePeers) {
             if (tcpClientMap.find(peer) != tcpClientMap.end()) {
                 auto tcpClient = tcpClientMap.at(peer);
@@ -243,8 +241,9 @@ namespace lab2 {
                 auto msgType = SerDe::getMsgType(message);
                 CHECK_EQ(msgType, MsgTypeEnum::REQUEST);
                 auto requestMsg = SerDe::deserializeRequestMsg(message);
-                if (requestMsg.operationType != NOTHING) {
-                    VLOG(1) << "received pendingRequestMsg: " << requestMsg << ", from peerId:" << peer;
+                VLOG(1) << "received pendingRequestMsg: " << requestMsg << ", from peerId:" << peer;
+                if (requestMsg.operationType != OperationTypeEnum::NOTHING) {
+                    LOG(INFO) << "received pendingRequestMsg: " << requestMsg << ", from peerId:" << peer;
                     pendingRequestMsg = requestMsg;
                 }
             }
@@ -300,11 +299,11 @@ namespace lab2 {
                 alivePeers.erase(leaderPeerId);
             }
             sendNewLeaderMsg();
-            pendingRequest = waitForPendingRequestMsg();
-            if (pendingRequest.operationType != NOTHING) {
-                LOG(INFO) << "completing pending request: " << pendingRequest;
-                modifyGroupMembership(pendingRequest.peerId,
-                                      static_cast<OperationTypeEnum>(pendingRequest.operationType));
+            auto pendingRequestMsg = waitForPendingRequestMsg();
+            if (pendingRequestMsg.operationType != NOTHING) {
+                LOG(INFO) << "completing pending request: " << pendingRequestMsg;
+                modifyGroupMembership(pendingRequestMsg.peerId,
+                                      static_cast<OperationTypeEnum>(pendingRequestMsg.operationType));
             } else {
                 sendNewViewMsg();
             }
@@ -313,6 +312,8 @@ namespace lab2 {
         } else {
             waitForNewLeaderMsg();
             sendPendingRequestMsg();
+            waitForRequestMsg();
+            sendOkMsg(createOkMsg());
         }
     }
 

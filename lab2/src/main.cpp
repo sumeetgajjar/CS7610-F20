@@ -13,6 +13,7 @@ DEFINE_string(hostfile, "", "path to the hostfile");
 DEFINE_validator(hostfile, [](const char *, const std::string &value) {
     return !value.empty();
 });
+DEFINE_bool(leaderFailureDemo, false, "if enabled demo leader failure");
 
 void handleSignal(int signalNum) {
     google::FlushLogFiles(google::INFO);

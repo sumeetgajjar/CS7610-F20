@@ -12,10 +12,13 @@
 #include <mutex>
 #include <condition_variable>
 
+#include <gflags/gflags.h>
+
 #include "message.h"
 #include "network_utils.h"
 
 #define HEARTBEAT_INTERVAL_MS 1000
+DECLARE_bool(leaderFailureDemo);
 
 namespace lab2 {
     typedef std::unordered_map<std::string, PeerId> HostnameToPeerIdMap;
