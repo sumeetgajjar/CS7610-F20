@@ -4,7 +4,6 @@ import os
 import subprocess
 import time
 import unittest
-from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Callable, Any
 
 
@@ -137,7 +136,8 @@ class BaseSuite(unittest.TestCase):
 
 
 class MembershipSuite(BaseSuite):
-    VIEW_INSTALLATION_SUBSTR = "installed view info"
+    NEW_VIEW_INSTALLED_SUBSTR = "installed view info"
+    NEW_VIEW_DELIVERY_SUBSTR = "newViewMsg delivered to all peers"
     PROCESS_CRASHED_SUBSTR = "not reachable"
 
     @classmethod
@@ -150,35 +150,41 @@ class MembershipSuite(BaseSuite):
     def tearDown(self) -> None:
         self.stop_and_remove_running_containers()
 
-    def __get_app_args(self, host: str, is_test_case_4: bool) -> Dict[str, str]:
+    def __get_app_args(self, host: str, leader_failure_demo: bool) -> Dict[str, str]:
         return {
             'HOST': host,
             'NETWORK_BRIDGE': NETWORK_BRIDGE,
             'LOG_DIR': self.get_host_log_dir(host),
             'VERBOSE': self.get_verbose_logging_flag(),
-            'ARGS': '--leaderFailureDemo' if is_test_case_4 else ''
+            'ARGS': '--leaderFailureDemo' if leader_failure_demo else ''
         }
 
-    def __wait_for_view_installation(self, host: str, required_view_log_count: int):
-        logging.debug(f"waiting for new view installation in host: {host}")
+    def __wait_for_new_view_delivery(self, leader_host: str, required_view_log_count: int):
+        logging.debug(f"waiting for new view delivery in leader: {leader_host}")
         view_log = []
 
         def __callback(log_line: str, view_log_count: int) -> bool:
-            if self.VIEW_INSTALLATION_SUBSTR in log_line:
+            if self.NEW_VIEW_DELIVERY_SUBSTR in log_line:
                 view_log.append(log_line)
 
             return len(view_log) < view_log_count
 
-        self.tail_container_logs(host, __callback, view_log_count=required_view_log_count)
+        self.tail_container_logs(leader_host, __callback, view_log_count=required_view_log_count)
+        logging.debug(f"found {len(view_log)} newViewMsg delivery in leader: {leader_host}")
 
-    def __start_all_containers(self, is_test_case_4: bool = False):
+    def __start_all_containers(self, leader_failure_demo: bool = False):
+        leader_host = self.HOSTS[0]
         for ix, host in enumerate(self.HOSTS):
             logging.info(f"starting container for host: {host}")
-            p_run = self.run_shell(START_CONTAINER_CMD.format(**self.__get_app_args(host, is_test_case_4)))
+            p_run = self.run_shell(
+                START_CONTAINER_CMD.format(**self.__get_app_args(host, leader_failure_demo if ix == 0 else False)))
             self.assert_process_exit_status(f"{host} container run cmd", p_run)
-            self.__wait_for_view_installation(host, required_view_log_count=1)
 
-    def __wait_for_peer_crash(self, host: str, peer_crash_count: int):
+            if host != leader_host:
+                # Waiting for non-leader hosts
+                self.__wait_for_new_view_delivery(leader_host, required_view_log_count=ix)
+
+    def __wait_for_peer_crash_detection(self, host: str, peer_crash_count: int):
         logging.debug(f"waiting for peer crash detection in host: {host}")
         peer_crash_msg = []
 
@@ -197,7 +203,7 @@ class MembershipSuite(BaseSuite):
         for ix, host in enumerate(self.HOSTS):
             expected_view_installations = len(self.HOSTS) - ix
             actual_view_installations = sum([1 for line in self.get_container_logs(host)
-                                             if self.VIEW_INSTALLATION_SUBSTR in line])
+                                             if self.NEW_VIEW_DELIVERY_SUBSTR in line])
             logging.info(f"found {actual_view_installations} view installations for {host}")
             self.assertEqual(expected_view_installations, actual_view_installations)
 
@@ -210,7 +216,7 @@ class MembershipSuite(BaseSuite):
         p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_crash))
         self.assert_process_exit_status("crash peer cmd", p_stop)
         logging.info("waiting for peer crashed messages")
-        self.__wait_for_peer_crash(leader_host, 1)
+        self.__wait_for_peer_crash_detection(leader_host, 1)
 
         # sleeping for (HEARTBEAT_INTERVAL_MS * 3) so all peers can detect the crash
         time.sleep(2)
@@ -232,7 +238,7 @@ class MembershipSuite(BaseSuite):
             p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_stop))
             self.assert_process_exit_status("crash peer cmd", p_stop)
             logging.info("waiting for peer crashed messages")
-            self.__wait_for_peer_crash(leader_host, ix + 1)
+            self.__wait_for_peer_crash_detection(leader_host, ix + 1)
 
             # sleeping for (HEARTBEAT_INTERVAL_MS * 3) so all peers can detect the crash
             time.sleep(2)
@@ -248,9 +254,11 @@ class MembershipSuite(BaseSuite):
 
     def test_case_4(self):
         initial_leader_host = self.HOSTS[0]
-        new_leader_host = self.HOSTS[0]
+        new_leader_host = self.HOSTS[1]
         peer_to_stop = self.HOSTS[-1]
-        self.__start_all_containers(is_test_case_4=True)
+        self.__start_all_containers(leader_failure_demo=True)
+
+        logging.info(f"crashing {peer_to_stop}")
         p_stop = self.run_shell(STOP_CONTAINERS_CMD.format(CONTAINERS=peer_to_stop))
         self.assert_process_exit_status("crash peer cmd", p_stop)
 
@@ -258,24 +266,22 @@ class MembershipSuite(BaseSuite):
         self.tail_container_logs(initial_leader_host,
                                  lambda log_line: "crashing Leader purposefully for TestCase 4" not in log_line)
 
-        # Wait for the new leader to detect 2 crashes
-        self.__wait_for_peer_crash(new_leader_host, 2)
         # waiting for new view installation
-        self.__wait_for_view_installation(new_leader_host, 5)
+        self.__wait_for_new_view_delivery(new_leader_host, 1)
 
-        actual_process_crashes = []
+        actual_view_installed = []
         for host in self.HOSTS:
-            actual_process_crashes.append(sum([1 for line in self.get_container_logs(host)
-                                               if self.VIEW_INSTALLATION_SUBSTR in line]))
+            actual_view_installed.append(sum([1 for line in self.get_container_logs(host)
+                                              if self.NEW_VIEW_INSTALLED_SUBSTR in line]))
 
         # If there 5 peers, then expected view installations in peers P[1-5] by initial leader: [5,4,3,2,1]
         # view installation in peers p[1-5] by new leader: [0,1,1,1,0]
         # total view installations: [5,5,4,3,1]
-        expected_process_crashes = list(reversed(range(1, len(self.HOSTS) + 1)))
-        for ix in range(1, len(self.HOSTS)):
-            expected_process_crashes[ix] += 1
+        expected_view_installed = list(reversed(range(1, len(self.HOSTS) + 1)))
+        for ix in range(1, len(self.HOSTS[:-1])):
+            expected_view_installed[ix] += 1
 
-        self.assertListEqual(expected_process_crashes, actual_process_crashes)
+        self.assertListEqual(expected_view_installed, actual_view_installed)
 
 
 if __name__ == '__main__':

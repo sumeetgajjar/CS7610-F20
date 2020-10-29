@@ -127,14 +127,14 @@ namespace lab2 {
                 tcpClient.send(buffer, sizeof(NewViewMsg));
             }
         }
-        VLOG(1) << "newViewMsg sent to all peers";
+        LOG(INFO) << "newViewMsg delivered to all peers";
     }
 
     void MembershipService::sendPendingRequestMsg() {
         VLOG(1) << "inside sendPendingRequestMsg";
         auto requestMsg = pendingRequest;
         requestMsg.currentViewId = viewId;
-        VLOG(1) << "sending pendingRequestMsg: " << pendingRequest << ", to leaderPeerId: " << leaderPeerId;
+        LOG(INFO) << "sending pendingRequestMsg: " << pendingRequest << ", to leaderPeerId: " << leaderPeerId;
         char buffer[sizeof(RequestMsg)];
         SerDe::serializeRequestMsg(requestMsg, buffer);
         auto leaderTcpClient = tcpClientMap.at(leaderPeerId);
@@ -144,11 +144,11 @@ namespace lab2 {
     void MembershipService::sendNewLeaderMsg() {
         VLOG(1) << "inside sendNewLeaderMsg";
         auto newLeaderMsg = createNewLeaderMsg();
+        LOG(INFO) << "sending newLeaderMsg: " << newLeaderMsg;
         char buffer[sizeof(NewLeaderMsg)];
         SerDe::serializeNewLeaderMsg(newLeaderMsg, buffer);
         for (const auto &peer : alivePeers) {
             try {
-                VLOG(1) << "sending newLeaderMsg: " << newLeaderMsg << ", to peerId: " << peer;
                 auto client = TcpClient(peerIdToHostnameMap.at(peer), membershipPort, 5);
                 client.send(buffer, sizeof(NewLeaderMsg));
                 tcpClientMap.insert(std::make_pair(peer, client));
@@ -160,11 +160,11 @@ namespace lab2 {
 
     void MembershipService::waitForRequestMsg() {
         TcpClient leaderTcpClient = tcpClientMap.at(leaderPeerId);
-        LOG(INFO) << "waiting for RequestMsg from leader: " << leaderPeerId;
+        VLOG(1) << "waiting for RequestMsg from leader: " << leaderPeerId;
         auto rawReqMessage = leaderTcpClient.receive();
 
         auto msgTypeEnum = SerDe::getMsgType(rawReqMessage);
-        LOG(INFO) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
+        VLOG(1) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
         CHECK_EQ(msgTypeEnum, MsgTypeEnum::REQUEST);
         pendingRequest = SerDe::deserializeRequestMsg(rawReqMessage);
         LOG(INFO) << "received requestMsg: " << pendingRequest << ", from leader: " << leaderPeerId;
@@ -173,12 +173,12 @@ namespace lab2 {
     void MembershipService::waitForOkMsg(RequestId expectedRequestId) {
         std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
         for (const auto peerId: alivePeers) {
-            LOG(INFO) << "waiting for OkMsg from peerId: " << peerId;
+            VLOG(1) << "waiting for OkMsg from peerId: " << peerId;
             auto tcpClient = tcpClientMap.at(peerId);
             auto rawOkMessage = tcpClient.receive();
 
             auto msgTypeEnum = SerDe::getMsgType(rawOkMessage);
-            LOG(INFO) << "received " << msgTypeEnum << " from peerId: " << peerId;
+            VLOG(1) << "received " << msgTypeEnum << " from peerId: " << peerId;
             CHECK_EQ(msgTypeEnum, MsgTypeEnum::OK);
             auto okMsg = SerDe::deserializeOkMsg(rawOkMessage);
             LOG(INFO) << "received okMsg: " << okMsg << ", from peerId: " << peerId;
@@ -188,11 +188,11 @@ namespace lab2 {
 
     void MembershipService::waitForNewViewMsg() {
         TcpClient leaderTcpClient = tcpClientMap.at(leaderPeerId);
-        LOG(INFO) << "waiting for NewViewMsg from leader: " << leaderPeerId;
+        VLOG(1) << "waiting for NewViewMsg from leader: " << leaderPeerId;
         auto rawNewViewMessage = leaderTcpClient.receive();
 
         auto msgTypeEnum = SerDe::getMsgType(rawNewViewMessage);
-        LOG(INFO) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
+        VLOG(1) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
         CHECK_EQ(msgTypeEnum, MsgTypeEnum::NEW_VIEW);
 
         auto newViewMsg = SerDe::deserializeNewViewMsg(rawNewViewMessage);
@@ -220,13 +220,13 @@ namespace lab2 {
 
         leaderPeerId = hostnameToPeerIdMap.at(leaderClient.getHostname());
         tcpClientMap.insert(std::make_pair(leaderPeerId, leaderClient));
-        LOG(INFO) << "new  leader detected, peerId: " << leaderPeerId;
+        LOG(INFO) << "new leader detected, peerId: " << leaderPeerId;
 
         auto message = leaderClient.receive();
         auto msgType = SerDe::getMsgType(message);
         CHECK_EQ(msgType, MsgTypeEnum::NEW_LEADER);
         auto newLeaderMsg = SerDe::deserializeNewLeaderMsg(message);
-        VLOG(1) << "received newLeaderMsg: " << newLeaderMsg << ", from leaderPeerId: " << leaderPeerId;
+        LOG(INFO) << "received newLeaderMsg: " << newLeaderMsg << ", from leaderPeerId: " << leaderPeerId;
     }
 
     RequestMsg MembershipService::waitForPendingRequestMsg() {
@@ -319,7 +319,6 @@ namespace lab2 {
 
     [[noreturn]] void MembershipService::startListening() {
         LOG(INFO) << "starting listening for new peers on port: " << membershipPort;
-        printNewlyInstalledView();
 
         TcpServer server(membershipPort);
         while (true) {
@@ -450,6 +449,7 @@ namespace lab2 {
         std::thread serviceThread([&]() {
             VLOG(1) << "starting service thread";
             if (myPeerId == leaderPeerId) {
+                printNewlyInstalledView();
                 startListening();
             } else {
                 auto leaderHostname = peerIdToHostnameMap.at(leaderPeerId);
