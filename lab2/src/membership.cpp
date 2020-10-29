@@ -20,7 +20,7 @@ namespace lab2 {
         return requestMsg;
     }
 
-    bool isEmptyPendingRequestMsg(const RequestMsg &requestMsg) {
+    bool isRequestPending(const RequestMsg &requestMsg) {
         return requestMsg.msgType == MsgTypeEnum::REQUEST &&
                requestMsg.requestId == 0 &&
                requestMsg.currentViewId == 0 &&
@@ -74,14 +74,26 @@ namespace lab2 {
         return okMsg;
     }
 
-    void MembershipService::sendRequestMsg(PeerId peerId, const RequestMsg &requestMsg) {
-        LOG(INFO) << "sending RequestMsg: " << requestMsg << ", to peerId: " << peerId;
+    NewLeaderMsg MembershipService::createNewLeaderMsg() {
+        NewLeaderMsg msg;
+        msg.msgType = MsgTypeEnum::NEW_LEADER;
+        msg.requestId = ++requestIdCounter;
+        msg.currentViewId = viewId;
+        msg.operationType = OperationTypeEnum::PENDING;
+        return msg;
+    }
+
+    void MembershipService::sendRequestMsg(const RequestMsg &requestMsg) {
+        LOG(INFO) << "sending RequestMsg: " << requestMsg;
         char buffer[sizeof(RequestMsg)];
         SerDe::serializeRequestMsg(requestMsg, buffer);
 
-        auto tcpClient = tcpClientMap.at(peerId);
-        tcpClient.send(buffer, sizeof(RequestMsg));
-        VLOG(1) << "requestMsg sent to peerId: " << peerId;
+        std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
+        for (const auto peerId: alivePeers) {
+            auto tcpClient = tcpClientMap.at(peerId);
+            tcpClient.send(buffer, sizeof(RequestMsg));
+        }
+        VLOG(1) << "requestMsg sent";
     }
 
     void MembershipService::sendOkMsg(const OkMsg &okMsg) {
@@ -118,6 +130,37 @@ namespace lab2 {
         VLOG(1) << "newViewMsg sent to all peers";
     }
 
+    void MembershipService::sendPendingRequestMsg() {
+        VLOG(1) << "inside sendPendingRequestMsg";
+        auto requestMsg = pendingRequest;
+        requestMsg.currentViewId = viewId;
+        if (!isRequestPending(requestMsg)) {
+            requestMsg.operationType = OperationTypeEnum::NOTHING;
+        }
+        VLOG(1) << "sending pendingRequestMsg: " << pendingRequest << ", to leaderPeerId: " << leaderPeerId;
+        char buffer[sizeof(RequestMsg)];
+        SerDe::serializeRequestMsg(requestMsg, buffer);
+        auto leaderTcpClient = tcpClientMap.at(leaderPeerId);
+        leaderTcpClient.send(buffer, sizeof(RequestMsg));
+    }
+
+    void MembershipService::sendNewLeaderMsg() {
+        VLOG(1) << "inside sendNewLeaderMsg";
+        auto newLeaderMsg = createNewLeaderMsg();
+        char buffer[sizeof(NewLeaderMsg)];
+        SerDe::serializeNewLeaderMsg(newLeaderMsg, buffer);
+        for (const auto &peer : alivePeers) {
+            try {
+                VLOG(1) << "sending newLeaderMsg: " << newLeaderMsg << ", to peerId: " << peer;
+                auto client = TcpClient(peerIdToHostnameMap.at(peer), membershipPort, 10);
+                client.send(buffer, sizeof(NewLeaderMsg));
+                tcpClientMap.insert(std::make_pair(peer, client));
+            } catch (const std::runtime_error &e) {
+                LOG(ERROR) << "cannot send newLeaderMsg to peerId: " << peer;
+            }
+        }
+    }
+
     void MembershipService::waitForRequestMsg() {
         TcpClient leaderTcpClient = tcpClientMap.at(leaderPeerId);
         LOG(INFO) << "waiting for RequestMsg from leader: " << leaderPeerId;
@@ -130,17 +173,20 @@ namespace lab2 {
         LOG(INFO) << "received requestMsg: " << pendingRequest << ", from leader: " << leaderPeerId;
     }
 
-    void MembershipService::waitForOkMsg(PeerId peerId, RequestId expectedRequestId) {
-        LOG(INFO) << "waiting for OkMsg from peerId: " << peerId;
-        auto tcpClient = tcpClientMap.at(peerId);
-        auto rawOkMessage = tcpClient.receive();
+    void MembershipService::waitForOkMsg(RequestId expectedRequestId) {
+        std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
+        for (const auto peerId: alivePeers) {
+            LOG(INFO) << "waiting for OkMsg from peerId: " << peerId;
+            auto tcpClient = tcpClientMap.at(peerId);
+            auto rawOkMessage = tcpClient.receive();
 
-        auto msgTypeEnum = SerDe::getMsgType(rawOkMessage);
-        LOG(INFO) << "received " << msgTypeEnum << " from peerId: " << peerId;
-        CHECK_EQ(msgTypeEnum, MsgTypeEnum::OK);
-        auto okMsg = SerDe::deserializeOkMsg(rawOkMessage);
-        LOG(INFO) << "received okMsg: " << okMsg << ", from peerId: " << peerId;
-        CHECK_EQ(okMsg.requestId, expectedRequestId);
+            auto msgTypeEnum = SerDe::getMsgType(rawOkMessage);
+            LOG(INFO) << "received " << msgTypeEnum << " from peerId: " << peerId;
+            CHECK_EQ(msgTypeEnum, MsgTypeEnum::OK);
+            auto okMsg = SerDe::deserializeOkMsg(rawOkMessage);
+            LOG(INFO) << "received okMsg: " << okMsg << ", from peerId: " << peerId;
+            CHECK_EQ(okMsg.requestId, expectedRequestId);
+        }
     }
 
     void MembershipService::waitForNewViewMsg() {
@@ -167,6 +213,45 @@ namespace lab2 {
         printNewlyInstalledView();
     }
 
+    void MembershipService::waitForNewLeaderMsg() {
+        VLOG(1) << "inside waitForNewLeaderMsg";
+        TcpServer tcpServer(membershipPort);
+        VLOG(1) << "waiting for newLeaderMsg";
+        auto leaderClient = tcpServer.accept();
+        tcpServer.close();
+
+        leaderPeerId = hostnameToPeerIdMap.at(leaderClient.getHostname());
+        tcpClientMap.insert(std::make_pair(leaderPeerId, leaderClient));
+        LOG(INFO) << "new  leader detected, peerId: " << leaderPeerId;
+
+        auto message = leaderClient.receive();
+        auto msgType = SerDe::getMsgType(message);
+        CHECK_EQ(msgType, MsgTypeEnum::NEW_LEADER);
+        auto newLeaderMsg = SerDe::deserializeNewLeaderMsg(message);
+        VLOG(1) << "received newLeaderMsg: " << newLeaderMsg << ", from leaderPeerId: " << leaderPeerId;
+    }
+
+    RequestMsg MembershipService::waitForPendingRequestMsg() {
+        VLOG(1) << "inside waitForPendingRequestMsg";
+        std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
+        RequestMsg pendingRequestMsg = getEmptyPendingRequestMsg();
+        for (const auto &peer : alivePeers) {
+            if (tcpClientMap.find(peer) != tcpClientMap.end()) {
+                auto tcpClient = tcpClientMap.at(peer);
+                VLOG(1) << "waiting for pendingRequestMsg from peerId: " << peer;
+                auto message = tcpClient.receive();
+                auto msgType = SerDe::getMsgType(message);
+                CHECK_EQ(msgType, MsgTypeEnum::REQUEST);
+                auto requestMsg = SerDe::deserializeRequestMsg(message);
+                if (requestMsg.operationType != NOTHING) {
+                    VLOG(1) << "received pendingRequestMsg: " << requestMsg << ", from peerId:" << peer;
+                    pendingRequestMsg = requestMsg;
+                }
+            }
+        }
+        return pendingRequestMsg;
+    }
+
     void MembershipService::modifyGroupMembership(PeerId peerId, OperationTypeEnum operationType) {
         VLOG(1) << "inside modifyGroupMembership, peerId: " << peerId << ", operationType: " << operationType;
         RequestMsg requestMsg = createRequestMsg(peerId, operationType);
@@ -181,10 +266,8 @@ namespace lab2 {
                           << ", GroupSize: " << getGroupMembers().size();
             }
 
-            for (const auto member: alivePeers) {
-                sendRequestMsg(member, requestMsg);
-                waitForOkMsg(member, requestMsg.requestId);
-            }
+            sendRequestMsg(requestMsg);
+            waitForOkMsg(requestMsg.requestId);
 
             if (operationType == OperationTypeEnum::ADD) {
                 alivePeers.insert(peerId);
@@ -197,8 +280,44 @@ namespace lab2 {
         sendNewViewMsg();
     }
 
+    void MembershipService::handleLeaderCrash() {
+        VLOG(1) << "inside handleLeaderCrash";
+        tcpClientMap.erase(leaderPeerId);
+        auto nextLeader = [&]() {
+            for (const auto peer : getGroupMembers()) {
+                if (peer != leaderPeerId) {
+                    return peer;
+                }
+            }
+            return (PeerId) 0;
+        }();
+        CHECK_NE(nextLeader, 0);
+        LOG(INFO) << "new leader candidate peerId: " << nextLeader;
+        if (myPeerId == nextLeader) {
+            LOG(INFO) << "I am the new leader";
+            {
+                std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
+                alivePeers.erase(leaderPeerId);
+            }
+            sendNewLeaderMsg();
+            pendingRequest = waitForPendingRequestMsg();
+            if (pendingRequest.operationType != NOTHING) {
+                LOG(INFO) << "completing pending request: " << pendingRequest;
+                modifyGroupMembership(pendingRequest.peerId,
+                                      static_cast<OperationTypeEnum>(pendingRequest.operationType));
+            } else {
+                sendNewViewMsg();
+            }
+            leaderPeerId = nextLeader;
+            startListening();
+        } else {
+            waitForNewLeaderMsg();
+            sendPendingRequestMsg();
+        }
+    }
+
     [[noreturn]] void MembershipService::startListening() {
-        LOG(INFO) << "starting MembershipService on port: " << membershipPort;
+        LOG(INFO) << "starting listening for new peers on port: " << membershipPort;
         printNewlyInstalledView();
 
         TcpServer server(membershipPort);
@@ -211,11 +330,7 @@ namespace lab2 {
         }
     }
 
-    [[noreturn]] void MembershipService::connectToLeader() {
-        auto leaderHostname = peerIdToHostnameMap.at(leaderPeerId);
-        LOG(INFO) << "connecting to leader, peerId: " << leaderPeerId << ", host: " << leaderHostname;
-        auto leaderTcpClient = TcpClient(leaderHostname, membershipPort);
-        tcpClientMap.insert(std::make_pair(leaderPeerId, leaderTcpClient));
+    [[noreturn]] void MembershipService::waitForMessagesFromLeader() {
         while (true) {
             waitForNewViewMsg();
             waitForRequestMsg();
@@ -235,7 +350,7 @@ namespace lab2 {
             i++;
         }
         ss << "}";
-        LOG(INFO) << "new view installed, viewId: " << viewId << ", members: " << ss.str();
+        LOG(INFO) << "installed view info, viewId: " << viewId << ", members: " << ss.str();
     }
 
     void MembershipService::startSendingHeartBeat() {
@@ -315,7 +430,11 @@ namespace lab2 {
                                 modifyGroupMembership(crashedPeerId, OperationTypeEnum::DEL);
                             } else if (crashedPeerId == leaderPeerId) {
                                 LOG(WARNING) << "Leader " << crashedPeerId << " has crashed";
-                                //TODO implement this
+                                {
+                                    std::scoped_lock<std::mutex> lock(leaderCrashedMutex);
+                                    leaderCrashed = true;
+                                }
+                                leaderCrashedCV.notify_one();
                             }
                             // breaking out of the loop since the iterator is invalidated due to modification
                             // of heartBeatReceivers set.
@@ -332,7 +451,23 @@ namespace lab2 {
             if (myPeerId == leaderPeerId) {
                 startListening();
             } else {
-                connectToLeader();
+                auto leaderHostname = peerIdToHostnameMap.at(leaderPeerId);
+                LOG(INFO) << "connecting to leader, peerId: " << leaderPeerId << ", host: " << leaderHostname;
+                auto leaderTcpClient = TcpClient(leaderHostname, membershipPort);
+                tcpClientMap.insert(std::make_pair(leaderPeerId, leaderTcpClient));
+                while (true) {
+                    try {
+                        waitForMessagesFromLeader();
+                    } catch (const TransportException &e) {
+                        VLOG(1) << "waiting for leader crash detection";
+                        {
+                            std::unique_lock<std::mutex> lock(leaderCrashedMutex);
+                            leaderCrashedCV.wait(lock, [&] { return leaderCrashed; });
+                            leaderCrashed = false;
+                        }
+                        handleLeaderCrash();
+                    }
+                }
             }
         });
 
@@ -343,5 +478,3 @@ namespace lab2 {
 
 #pragma clang diagnostic pop
 }
-
-//TODO add logging

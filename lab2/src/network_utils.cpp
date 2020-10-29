@@ -168,8 +168,8 @@ namespace lab2 {
         addr_len = sizeof(their_addr);
         char buffer[MAX_BUFFER_SIZE];
         VLOG(1) << "waiting for message";
-        if (ssize_t numBytes = recvfrom(recvFD, buffer, MAX_BUFFER_SIZE, 0, (struct sockaddr *) &their_addr,
-                                        &addr_len);
+        if (ssize_t numBytes = ::recvfrom(recvFD, buffer, MAX_BUFFER_SIZE, 0, (struct sockaddr *) &their_addr,
+                                          &addr_len);
                 numBytes == -1) {
             std::string errorMessage("error(" + std::to_string(errno) + ") occurred while receiving data");
             LOG(ERROR) << errorMessage;
@@ -253,7 +253,7 @@ namespace lab2 {
         const std::string clientHostname = NetworkUtils::getHostnameFromSocket(&clientAddr);
         const int clientPort = std::stoi(NetworkUtils::getServiceNameFromSocket(&clientAddr));
         VLOG(1) << "received incoming connection from " << clientHostname << ":" << clientPort;
-        return TcpClient(clientHostname, clientPort, clientFd);
+        return TcpClient(clientFd, clientHostname, clientPort);
     }
 
     void TcpServer::close() {
@@ -262,21 +262,22 @@ namespace lab2 {
     }
 
 
-    TcpClient::TcpClient(std::string hostname_, const int port, const int fd) : hostname(std::move(hostname_)),
-                                                                                port(port),
-                                                                                sockFd(fd) {
+    TcpClient::TcpClient(int fd, std::string hostname_, int port) : hostname(std::move(hostname_)),
+                                                                    port(port),
+                                                                    sockFd(fd) {
         VLOG(1) << "tcp client created for host:" << hostname << ":" << port;
         LOG_IF(FATAL, hostname.empty()) << "hostname cannot be empty";
     }
 
-    TcpClient::TcpClient(std::string hostname_, const int port) : hostname(std::move(hostname_)), port(port) {
+    TcpClient::TcpClient(std::string hostname_, int port, int retryCount)
+            : hostname(std::move(hostname_)), port(port) {
         VLOG(1) << "creating tcp client for host: " << hostname << ":" << port;
         LOG_IF(FATAL, hostname.empty()) << "hostname cannot be empty";
         struct addrinfo hints, *serverInfoList, *serverAddrInfo;
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
-        while (true) {
+        for (int i = 0; i <= retryCount; i++) {
             try {
                 sockFd = bindSocketToFd(hostname, port, hints, &serverInfoList, &serverAddrInfo);
                 CHECK(serverAddrInfo != nullptr)
@@ -288,6 +289,9 @@ namespace lab2 {
                 break;
             } catch (const std::exception &e) {
                 LOG(ERROR) << "tcp client failed to connect to host: " << hostname << ":" << port;
+                if (i >= retryCount) {
+                    throw e;
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds{1000});
                 VLOG(1) << "tcp client retrying to connect to host: " << hostname << ":" << port;
             }

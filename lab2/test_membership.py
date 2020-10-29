@@ -137,7 +137,7 @@ class BaseSuite(unittest.TestCase):
 
 
 class MembershipSuite(BaseSuite):
-    VIEW_INSTALLATION_SUBSTR = "new view installed"
+    VIEW_INSTALLATION_SUBSTR = "installed view info"
     PROCESS_CRASHED_SUBSTR = "not reachable"
 
     @classmethod

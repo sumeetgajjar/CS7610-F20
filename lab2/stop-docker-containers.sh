@@ -9,7 +9,14 @@ else
   echo "${RUNNING_CONTAINERS}"
   echo "========================================================================"
   echo "stopping containers"
-  docker ps --filter name="sumeet-g*" --format="{{.ID}}" | xargs docker stop
+  echo "========================================================================"
+  docker stop ${RUNNING_CONTAINERS}
+fi
+
+RUNNING_CONTAINERS=$(docker ps -a --filter name="sumeet-g*" --format="{{.Names}}")
+if [ -n "${RUNNING_CONTAINERS}" ]; then
+  echo "========================================================================"
   echo "removing containers"
-  docker ps --filter name="sumeet-g*" --format="{{.ID}}" | xargs docker rm
+  echo "========================================================================"
+  docker rm ${RUNNING_CONTAINERS}
 fi

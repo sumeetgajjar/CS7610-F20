@@ -5,6 +5,7 @@
 #ifndef LAB1_NETWORK_UTILS_H
 #define LAB1_NETWORK_UTILS_H
 
+#include <limits>
 #include <string>
 #include <netdb.h>
 
@@ -49,7 +50,7 @@ namespace lab2 {
         void initSocket();
 
     public:
-        UDPSender(std::string serverHost, int serverPort, int retryCount = -1);
+        UDPSender(std::string serverHost, int serverPort, int retryCount = std::numeric_limits<int>::max());
 
         void send(const char *buff, size_t size);
 
@@ -77,9 +78,9 @@ namespace lab2 {
         int sockFd;
 
     public:
-        TcpClient(std::string hostname_, int port, int fd);
+        TcpClient(int fd, std::string hostname_, int port);
 
-        TcpClient(std::string hostname_, int port);
+        TcpClient(std::string hostname_, int port, int retryCount = std::numeric_limits<int>::max());
 
         std::string getHostname() const;
 

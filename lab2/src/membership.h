@@ -10,6 +10,7 @@
 #include <bits/unordered_set.h>
 #include <set>
 #include <mutex>
+#include <condition_variable>
 
 #include "message.h"
 #include "network_utils.h"
@@ -38,29 +39,45 @@ namespace lab2 {
         TcpClientMap tcpClientMap;
         RequestMsg pendingRequest;
 
+        bool leaderCrashed = false;
+        std::mutex leaderCrashedMutex;
+        std::condition_variable leaderCrashedCV;
+
         std::set<PeerId> getGroupMembers();
 
         RequestMsg createRequestMsg(PeerId newPeerId, OperationTypeEnum operationTypeEnum);
 
         OkMsg createOkMsg() const;
 
-        void sendRequestMsg(PeerId peerId, const RequestMsg &requestMsg);
+        NewLeaderMsg createNewLeaderMsg();
+
+        void sendRequestMsg(const RequestMsg &requestMsg);
 
         void sendOkMsg(const OkMsg &okMsg);
 
         void sendNewViewMsg();
 
+        void sendPendingRequestMsg();
+
+        void sendNewLeaderMsg();
+
         void waitForRequestMsg();
+
+        void waitForOkMsg(RequestId expectedRequestId);
 
         void waitForNewViewMsg();
 
-        void waitForOkMsg(PeerId peerId, RequestId expectedRequestId);
+        void waitForNewLeaderMsg();
+
+        RequestMsg waitForPendingRequestMsg();
 
         void modifyGroupMembership(PeerId peerId, OperationTypeEnum operationType);
 
+        void handleLeaderCrash();
+
         [[noreturn]] void startListening();
 
-        [[noreturn]] void connectToLeader();
+        [[noreturn]] void waitForMessagesFromLeader();
 
         void printNewlyInstalledView();
 
