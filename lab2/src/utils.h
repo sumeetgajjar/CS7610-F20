@@ -2,8 +2,8 @@
 // Created by sumeet on 9/30/20.
 //
 
-#ifndef LAB1_UTILS_H
-#define LAB1_UTILS_H
+#ifndef LAB2_UTILS_H
+#define LAB2_UTILS_H
 
 
 #include <string>
@@ -25,4 +25,4 @@ namespace lab2 {
 }
 
 
-#endif //LAB1_UTILS_H
+#endif //LAB2_UTILS_H

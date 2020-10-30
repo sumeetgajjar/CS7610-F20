@@ -1,7 +1,7 @@
 # Steps to run the code
 
 ### Building the Docker image
-Command: `docker build . -t sumeet-g-prj1`
+Command: `docker build . -t sumeet-g-prj2`
 
 *Note:* The image is purposefully tagged with my name prefix to prevent accidental collision of image names with other
 submissions.
@@ -58,7 +58,7 @@ Logs:
 **(Recommended)**
 
 - Along with this, a `logs/<hostname>` folder is created for each host and is mounted to the corresponding docker container.
-So along with `docker logs`, logs are also present under `logs/<hostname>/lab1.INFO` file.
+So along with `docker logs`, logs are also present under `logs/<hostname>/lab2.INFO` file.
 This redundancy of logs is to prevent loss of logs in case the docker container is unknowingly removed.
 
 ### Stopping the docker containers
