@@ -62,11 +62,11 @@ namespace lab2 {
 
         void sendNewLeaderMsg();
 
-        void waitForRequestMsg();
+        void processRequestMsg(const Message &rawReqMessage);
 
         void waitForOkMsg(RequestId expectedRequestId);
 
-        void waitForNewViewMsg();
+        void processNewViewMsg(const Message &rawNewViewMessage);
 
         void waitForNewLeaderMsg();
 

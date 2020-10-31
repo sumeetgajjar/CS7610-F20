@@ -158,14 +158,8 @@ namespace lab2 {
         }
     }
 
-    void MembershipService::waitForRequestMsg() {
-        TcpClient leaderTcpClient = tcpClientMap.at(leaderPeerId);
-        VLOG(1) << "waiting for RequestMsg from leader: " << leaderPeerId;
-        auto rawReqMessage = leaderTcpClient.receive();
-
-        auto msgTypeEnum = SerDe::getMsgType(rawReqMessage);
-        VLOG(1) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
-        CHECK_EQ(msgTypeEnum, MsgTypeEnum::REQUEST);
+    void MembershipService::processRequestMsg(const Message &rawReqMessage) {
+        VLOG(1) << "processing RequestMsg from leader: " << leaderPeerId;
         pendingRequest = SerDe::deserializeRequestMsg(rawReqMessage);
         LOG(INFO) << "received requestMsg: " << pendingRequest << ", from leader: " << leaderPeerId;
     }
@@ -186,15 +180,8 @@ namespace lab2 {
         }
     }
 
-    void MembershipService::waitForNewViewMsg() {
-        TcpClient leaderTcpClient = tcpClientMap.at(leaderPeerId);
-        VLOG(1) << "waiting for NewViewMsg from leader: " << leaderPeerId;
-        auto rawNewViewMessage = leaderTcpClient.receive();
-
-        auto msgTypeEnum = SerDe::getMsgType(rawNewViewMessage);
-        VLOG(1) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
-        CHECK_EQ(msgTypeEnum, MsgTypeEnum::NEW_VIEW);
-
+    void MembershipService::processNewViewMsg(const Message &rawNewViewMessage) {
+        VLOG(1) << "processing NewViewMsg from leader: " << leaderPeerId;
         auto newViewMsg = SerDe::deserializeNewViewMsg(rawNewViewMessage);
         LOG(INFO) << "received newViewMsg: " << newViewMsg << ", from leader: " << leaderPeerId;
         viewId = newViewMsg.newViewId;
@@ -334,8 +321,6 @@ namespace lab2 {
         } else {
             waitForNewLeaderMsg();
             sendPendingRequestMsg();
-            waitForRequestMsg();
-            sendOkMsg(createOkMsg());
         }
     }
 
@@ -354,9 +339,24 @@ namespace lab2 {
 
     [[noreturn]] void MembershipService::waitForMessagesFromLeader() {
         while (true) {
-            waitForNewViewMsg();
-            waitForRequestMsg();
-            sendOkMsg(createOkMsg());
+            TcpClient leaderTcpClient = tcpClientMap.at(leaderPeerId);
+            VLOG(1) << "waiting for NewViewMsg from leader: " << leaderPeerId;
+            auto message = leaderTcpClient.receive();
+
+            auto msgTypeEnum = SerDe::getMsgType(message);
+            VLOG(1) << "received " << msgTypeEnum << " from leaderPeerId: " << leaderPeerId;
+            switch (msgTypeEnum) {
+                case REQUEST:
+                    processRequestMsg(message);
+                    sendOkMsg(createOkMsg());
+                    break;
+                case NEW_VIEW:
+                    processNewViewMsg(message);
+                    break;
+                default:
+                    LOG(FATAL) << "unexpected messageType: " << msgTypeEnum
+                               << " received from leaderPeerId: " << leaderPeerId;
+            }
         }
     }
 
