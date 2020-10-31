@@ -74,6 +74,8 @@ namespace lab2 {
 
         void modifyGroupMembership(PeerId peerId, OperationTypeEnum operationType);
 
+        void findLeader();
+
         void handleLeaderCrash();
 
         [[noreturn]] void startListening();

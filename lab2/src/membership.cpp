@@ -279,6 +279,28 @@ namespace lab2 {
         sendNewViewMsg();
     }
 
+    void MembershipService::findLeader() {
+        for (const auto &hostname: allPeerHostnames) {
+            auto peerId = hostnameToPeerIdMap.at(hostname);
+            if (myPeerId == peerId) {
+                leaderPeerId = peerId;
+                return;
+            }
+
+            LOG(INFO) << "trying hostname: " << hostname << ", peerId: " << peerId << " as leader";
+            try {
+                auto leaderTcpClient = TcpClient(hostname, membershipPort, 0);
+                leaderPeerId = peerId;
+                tcpClientMap.insert(std::make_pair(leaderPeerId, leaderTcpClient));
+                return;
+            } catch (const std::runtime_error &e) {
+                LOG(INFO) << "unable to connect to peerId: " << peerId;
+            }
+        }
+
+        LOG(FATAL) << "no leader found";
+    }
+
     void MembershipService::handleLeaderCrash() {
         VLOG(1) << "inside handleLeaderCrash";
         tcpClientMap.erase(leaderPeerId);
@@ -452,14 +474,12 @@ namespace lab2 {
 
         std::thread serviceThread([&]() {
             VLOG(1) << "starting service thread";
+            findLeader();
+            LOG(INFO) << "leaderPeerId: " << leaderPeerId;
             if (myPeerId == leaderPeerId) {
                 printNewlyInstalledView();
                 startListening();
             } else {
-                auto leaderHostname = peerIdToHostnameMap.at(leaderPeerId);
-                LOG(INFO) << "connecting to leader, peerId: " << leaderPeerId << ", host: " << leaderHostname;
-                auto leaderTcpClient = TcpClient(leaderHostname, membershipPort);
-                tcpClientMap.insert(std::make_pair(leaderPeerId, leaderTcpClient));
                 while (true) {
                     try {
                         waitForMessagesFromLeader();
