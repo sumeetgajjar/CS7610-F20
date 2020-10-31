@@ -46,8 +46,6 @@ namespace lab2 {
         std::mutex leaderCrashedMutex;
         std::condition_variable leaderCrashedCV;
 
-        std::set<PeerId> getGroupMembers();
-
         RequestMsg createRequestMsg(PeerId newPeerId, OperationTypeEnum operationTypeEnum);
 
         OkMsg createOkMsg() const;
@@ -90,6 +88,10 @@ namespace lab2 {
 
         MembershipService(int membershipPort, int heartBeatPort,
                           std::vector<std::string> allPeerHostnames_);
+
+        PeerId getMyPeerId();
+
+        std::set<PeerId> getGroupMembers();
 
         void start();
     };

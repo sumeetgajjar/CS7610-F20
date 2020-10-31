@@ -385,6 +385,10 @@ namespace lab2 {
         }
     }
 
+    PeerId MembershipService::getMyPeerId() {
+        return myPeerId;
+    }
+
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
 

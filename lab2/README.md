@@ -15,7 +15,7 @@ starting the containers.
 there are no messages left for multicast.
 
 
-#### How run the containers.
+#### How to run the testcases
 Use `test_membership.py` to run the various test cases (**Recommended and requires python3**) <br/>
 It is a python script which uses `unittest` framework to test various multicasting and snapshotting scenarios. <br/>
 All the test cases are present under the `MembershipSuite` test suite.
