@@ -289,7 +289,7 @@ namespace lab2 {
 
             LOG(INFO) << "trying hostname: " << hostname << ", peerId: " << peerId << " as leader";
             try {
-                auto leaderTcpClient = TcpClient(hostname, membershipPort, 0);
+                auto leaderTcpClient = TcpClient(hostname, membershipPort, 5);
                 leaderPeerId = peerId;
                 tcpClientMap.insert(std::make_pair(leaderPeerId, leaderTcpClient));
                 return;
