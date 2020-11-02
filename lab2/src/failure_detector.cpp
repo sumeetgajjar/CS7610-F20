@@ -13,7 +13,7 @@
 namespace lab2 {
 
     lab2::FailureDetector::FailureDetector(const int heartBeatPort,
-                                           std::function<void(unsigned int)> onFailureCallback) :
+                                           std::function<void(PeerId)> onFailureCallback) :
             heartBeatPort(heartBeatPort),
             onFailureCallback(std::move(onFailureCallback)) {}
 

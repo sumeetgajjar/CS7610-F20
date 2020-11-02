@@ -28,7 +28,7 @@ namespace lab2 {
 
     public:
         FailureDetector(int heartBeatPort,
-                        std::function<void(unsigned int)> onFailureCallback);
+                        std::function<void(PeerId)> onFailureCallback);
 
         void start();
     };
