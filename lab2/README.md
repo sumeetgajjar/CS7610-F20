@@ -53,13 +53,28 @@ Command: `python3 -m unittest test_membership.MembershipSuite.<test case name> -
 The verbosity of the logs can be increased by running the same command with VERBOSE=1 <br/>
 Command: `VERBOSE=1 python3 -m unittest test_membership.MembershipSuite.<test case name> -v` <br/>
 
-Logs:
+**Logs:**
 - The application logs are emitted to `stdout` and `stderr`, which can be accessed using `docker logs <hostname>`.
 **(Recommended)**
 
 - Along with this, a `logs/<hostname>` folder is created for each host and is mounted to the corresponding docker container.
 So along with `docker logs`, logs are also present under `logs/<hostname>/lab2.INFO` file.
 This redundancy of logs is to prevent loss of logs in case the docker container is unknowingly removed.
+
+**Manually start a container:**
+ 
+Command: `HOST='<hostname>'; docker run --name "${HOST}" --network cs7610-bridge --hostname "${HOST}" sumeet-g-prj2 --v 0 --hostfile /hostfile  --leaderFailureDemo`
+- --v: Controls the verbosity of the logs. Setting it to 1 will increase the amount of logs.
+Increasing the verbosity is only useful during the debugging phase but not in general.
+It is recommended to not set this flag to 1 unless required.
+
+- --hostfile: The path of the hostfile inside the docker container
+
+- --leaderFailureDemo: Setting this flag will turn on the leader failure mode, as mentioned in test case 4.<br/>
+When this flag is set for a peer and if the peer is the leader and is in middle of processing a Delete Operation then the
+following events occurs:
+    - the leader sends the delete `RequestMsg` to all peers except `PeerId:2`
+    - after sending the `RequestMsg` the leader exits before receiving any `OkMsg`.
 
 ### Stopping the docker containers
 Command: `./stop-docker-containers.sh`
