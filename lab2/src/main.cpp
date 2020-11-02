@@ -5,6 +5,7 @@
 
 #include "utils.h"
 #include "membership.h"
+#include "failure_detector.h"
 
 #define MEMBERSHIP_PORT 10000
 #define HEARTBEAT_PORT 10001
@@ -33,7 +34,23 @@ int main(int argc, char **argv) {
     registerSignalHandlers();
 
     const auto hostnames = Utils::readHostFile(FLAGS_hostfile);
-    auto service = MembershipService(MEMBERSHIP_PORT, HEARTBEAT_PORT, hostnames);
-    service.start();
+    PeerInfo::initialize(NetworkUtils::getCurrentHostname(), hostnames);
+    MembershipService membershipService(MEMBERSHIP_PORT);
+    FailureDetector failureDetector(HEARTBEAT_PORT, [&](PeerId crashedPeerId) {
+        membershipService.handlePeerFailure(crashedPeerId);
+    });
+
+    std::thread membershipServiceThread([&]() {
+        VLOG(1) << "starting membership service thread";
+        membershipService.start();
+    });
+
+    std::thread failureDetectorThread([&]() {
+        VLOG(1) << "starting failure detector service thread";
+        failureDetector.start();
+    });
+
+    membershipServiceThread.join();
+    failureDetectorThread.join();
     return 0;
 }

@@ -24,6 +24,7 @@ add_executable(lab2
         src/message.h
         src/serde.cpp
         src/serde.h
-        )
+        src/failure_detector.h
+        src/failure_detector.cpp)
 
 target_link_libraries(lab2 glog::glog gflags::gflags)

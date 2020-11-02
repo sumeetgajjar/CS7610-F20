@@ -20,29 +20,13 @@ namespace lab2 {
         return requestMsg;
     }
 
-    MembershipService::MembershipService(const int membershipPort, const int heartBeatPort,
-                                         std::vector<std::string> allPeerHostnames_)
-            : membershipPort(membershipPort),
-              heartBeatPort(heartBeatPort),
-              allPeerHostnames(std::move(allPeerHostnames_)) {
-
-        for (const auto &hostname : allPeerHostnames) {
-            auto peerId = Utils::getProcessIdentifier(hostname, allPeerHostnames);
-            hostnameToPeerIdMap[hostname] = peerId;
-            peerIdToHostnameMap[peerId] = hostname;
-        }
-
-        auto currentHostname = NetworkUtils::getCurrentHostname();
-        myPeerId = hostnameToPeerIdMap.at(currentHostname);
-        LOG(INFO) << "myPeerId: " << myPeerId;
-
-        pendingRequest = getDummyPendingRequestMsg();
-    }
+    MembershipService::MembershipService(int membershipPort)
+            : membershipPort(membershipPort), pendingRequest(getDummyPendingRequestMsg()) {}
 
     std::set<PeerId> MembershipService::getGroupMembers() {
         std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
         std::set<PeerId> groupMembers(alivePeers.begin(), alivePeers.end());
-        groupMembers.insert(myPeerId);
+        groupMembers.insert(PeerInfo::getMyPeerId());
         return groupMembers;
     }
 
@@ -50,7 +34,7 @@ namespace lab2 {
         VLOG(1) << "creating RequestMsg for " << operationTypeEnum;
         RequestMsg requestMsg;
         requestMsg.msgType = MsgTypeEnum::REQUEST;
-        requestMsg.requestId = ++requestIdCounter;
+        requestMsg.requestId = ++requestCounter;
         requestMsg.currentViewId = viewId;
         requestMsg.operationType = operationTypeEnum;
         requestMsg.peerId = newPeerId;
@@ -69,7 +53,7 @@ namespace lab2 {
     NewLeaderMsg MembershipService::createNewLeaderMsg() {
         NewLeaderMsg msg;
         msg.msgType = MsgTypeEnum::NEW_LEADER;
-        msg.requestId = ++requestIdCounter;
+        msg.requestId = ++requestCounter;
         msg.currentViewId = viewId;
         msg.operationType = OperationTypeEnum::PENDING;
         return msg;
@@ -149,7 +133,7 @@ namespace lab2 {
         SerDe::serializeNewLeaderMsg(newLeaderMsg, buffer);
         for (const auto &peer : alivePeers) {
             try {
-                auto client = TcpClient(peerIdToHostnameMap.at(peer), membershipPort, 5);
+                auto client = TcpClient(PeerInfo::getHostname(peer), membershipPort, 5);
                 client.send(buffer, sizeof(NewLeaderMsg));
                 tcpClientMap.insert(std::make_pair(peer, client));
             } catch (const std::runtime_error &e) {
@@ -162,6 +146,24 @@ namespace lab2 {
         VLOG(1) << "processing RequestMsg from leader: " << leaderPeerId;
         pendingRequest = SerDe::deserializeRequestMsg(rawReqMessage);
         LOG(INFO) << "received requestMsg: " << pendingRequest << ", from leader: " << leaderPeerId;
+    }
+
+    void MembershipService::processNewViewMsg(const Message &rawNewViewMessage) {
+        VLOG(1) << "processing NewViewMsg from leader: " << leaderPeerId;
+        auto newViewMsg = SerDe::deserializeNewViewMsg(rawNewViewMessage);
+        LOG(INFO) << "received newViewMsg: " << newViewMsg << ", from leader: " << leaderPeerId;
+        viewId = newViewMsg.newViewId;
+
+        {
+            std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
+            alivePeers.clear();
+            for (int i = 0; i < newViewMsg.numberOfMembers; i++) {
+                alivePeers.insert(newViewMsg.members[i]);
+            }
+            alivePeers.erase(PeerInfo::getMyPeerId());
+        }
+        pendingRequest = getDummyPendingRequestMsg();
+        printNewlyInstalledView();
     }
 
     void MembershipService::waitForOkMsg(RequestId expectedRequestId) {
@@ -180,24 +182,6 @@ namespace lab2 {
         }
     }
 
-    void MembershipService::processNewViewMsg(const Message &rawNewViewMessage) {
-        VLOG(1) << "processing NewViewMsg from leader: " << leaderPeerId;
-        auto newViewMsg = SerDe::deserializeNewViewMsg(rawNewViewMessage);
-        LOG(INFO) << "received newViewMsg: " << newViewMsg << ", from leader: " << leaderPeerId;
-        viewId = newViewMsg.newViewId;
-
-        {
-            std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
-            alivePeers.clear();
-            for (int i = 0; i < newViewMsg.numberOfMembers; i++) {
-                alivePeers.insert(newViewMsg.members[i]);
-            }
-            alivePeers.erase(myPeerId);
-        }
-        pendingRequest = getDummyPendingRequestMsg();
-        printNewlyInstalledView();
-    }
-
     void MembershipService::waitForNewLeaderMsg() {
         VLOG(1) << "inside waitForNewLeaderMsg";
         TcpServer tcpServer(membershipPort);
@@ -205,7 +189,7 @@ namespace lab2 {
         auto leaderClient = tcpServer.accept();
         tcpServer.close();
 
-        leaderPeerId = hostnameToPeerIdMap.at(leaderClient.getHostname());
+        leaderPeerId = PeerInfo::getPeerId(leaderClient.getHostname());
         tcpClientMap.insert(std::make_pair(leaderPeerId, leaderClient));
         LOG(INFO) << "new leader detected, peerId: " << leaderPeerId;
 
@@ -246,6 +230,7 @@ namespace lab2 {
 
             // removing the peer from the alive list since it is not reachable
             if (operationType == OperationTypeEnum::DEL) {
+
                 tcpClientMap.erase(peerId);
                 alivePeers.erase(peerId);
                 LOG(INFO) << "removed peerId: " << peerId << " from the group"
@@ -267,9 +252,9 @@ namespace lab2 {
     }
 
     void MembershipService::findLeader() {
-        for (const auto &hostname: allPeerHostnames) {
-            auto peerId = hostnameToPeerIdMap.at(hostname);
-            if (myPeerId == peerId) {
+        for (const auto &hostname: PeerInfo::getAllPeerHostnames()) {
+            auto peerId = PeerInfo::getPeerId(hostname);
+            if (peerId == PeerInfo::getMyPeerId()) {
                 leaderPeerId = peerId;
                 return;
             }
@@ -301,7 +286,7 @@ namespace lab2 {
         }();
         CHECK_NE(nextLeader, 0);
         LOG(INFO) << "new leader candidate peerId: " << nextLeader;
-        if (myPeerId == nextLeader) {
+        if (PeerInfo::getMyPeerId() == nextLeader) {
             LOG(INFO) << "I am the new leader";
             {
                 std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
@@ -317,27 +302,27 @@ namespace lab2 {
                 sendNewViewMsg();
             }
             leaderPeerId = nextLeader;
-            startListening();
+            startAsLeader();
         } else {
             waitForNewLeaderMsg();
             sendPendingRequestMsg();
         }
     }
 
-    [[noreturn]] void MembershipService::startListening() {
+    [[noreturn]] void MembershipService::startAsLeader() {
         LOG(INFO) << "starting listening for new peers on port: " << membershipPort;
 
         TcpServer server(membershipPort);
         while (true) {
             TcpClient tcpClient = server.accept();
-            PeerId newPeerId = hostnameToPeerIdMap.at(tcpClient.getHostname());
+            PeerId newPeerId = PeerInfo::getPeerId(tcpClient.getHostname());
             LOG(INFO) << "new peer detected, peerId: " << newPeerId << ", hostname: " << tcpClient.getHostname();
             tcpClientMap.insert(std::make_pair(newPeerId, tcpClient));
             modifyGroupMembership(newPeerId, OperationTypeEnum::ADD);
         }
     }
 
-    [[noreturn]] void MembershipService::waitForMessagesFromLeader() {
+    [[noreturn]] void MembershipService::startAsFollower() {
         while (true) {
             TcpClient leaderTcpClient = tcpClientMap.at(leaderPeerId);
             VLOG(1) << "waiting for NewViewMsg from leader: " << leaderPeerId;
@@ -375,131 +360,39 @@ namespace lab2 {
         LOG(INFO) << "installed view info, viewId: " << viewId << ", members: " << ss.str();
     }
 
-    void MembershipService::startSendingHeartBeat() {
-        VLOG(1) << "starting sending heartBeat";
-        for (const auto &pair : hostnameToPeerIdMap) {
-            if (pair.second == myPeerId) {
-                continue;
+    void MembershipService::handlePeerFailure(PeerId crashedPeerId) {
+        if (PeerInfo::getMyPeerId() == leaderPeerId) {
+            modifyGroupMembership(crashedPeerId, OperationTypeEnum::DEL);
+        } else if (crashedPeerId == leaderPeerId) {
+            LOG(WARNING) << "Leader: " << crashedPeerId << " is not reachable";
+            {
+                std::scoped_lock<std::mutex> lock(leaderCrashedMutex);
+                leaderCrashed = true;
             }
-
-            std::thread([&]() {
-                HeartBeatMsg msg;
-                msg.msgType = MsgTypeEnum::HEARTBEAT;
-                msg.peerId = myPeerId;
-                char buffer[sizeof(HeartBeatMsg)];
-                SerDe::serializeHeartBeatMsg(msg, buffer);
-
-                while (true) {
-                    auto hostname = pair.first;
-                    VLOG(1) << "sending HeartBeatMsg to peerId: " << hostname << ", msg: " << msg;
-                    try {
-                        auto udpSender = UDPSender(hostname, heartBeatPort, 0);
-                        udpSender.send(buffer, sizeof(HeartBeatMsg));
-                        udpSender.close();
-                    } catch (std::runtime_error &e) {
-                        VLOG(1) << "exception occured while sending heartbeat msg to peerId: " << hostname;
-                    }
-                    VLOG(1) << "heartbeat sender for PeerId: " << pair.second
-                            << "  sleeping for " << HEARTBEAT_INTERVAL_MS << " ms";
-                    std::this_thread::sleep_for(std::chrono::milliseconds{HEARTBEAT_INTERVAL_MS});
-                }
-            }).detach();
+            leaderCrashedCV.notify_one();
         }
     }
 
-    PeerId MembershipService::getMyPeerId() {
-        return myPeerId;
-    }
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "EndlessLoop"
-
     void MembershipService::start() {
-        startSendingHeartBeat();
-
-        std::unordered_map<PeerId, int> peerHeartBeatMap;
-        std::mutex peerHeartBeatMapMutex;
-
-        std::thread heartBeatReceiverThread([&]() {
-            VLOG(1) << "starting HeartBeatReceiver thread";
-            UDPReceiver udpReceiver(heartBeatPort);
+        findLeader();
+        LOG(INFO) << "leaderPeerId: " << leaderPeerId;
+        if (PeerInfo::getMyPeerId() == leaderPeerId) {
+            printNewlyInstalledView();
+            startAsLeader();
+        } else {
             while (true) {
-                auto message = udpReceiver.receive();
-                auto msgTypeEnum = SerDe::getMsgType(message);
-                CHECK_EQ(msgTypeEnum, MsgTypeEnum::HEARTBEAT);
-                VLOG(1) << "received " << msgTypeEnum << " from host: " << message.sender;
-                auto heartBeatMsg = SerDe::deserializeHeartBeatMsg(message);
-                VLOG(1) << "received HeartBeatMsg: " << heartBeatMsg;
-                {
-                    std::scoped_lock<std::mutex> lock(peerHeartBeatMapMutex);
-                    peerHeartBeatMap[heartBeatMsg.peerId] = 2;
-                }
-            }
-        });
-
-        std::thread failureDetectorThread([&]() {
-            VLOG(1) << "starting heartBeatMonitor Thread";
-            while (true) {
-                VLOG(1) << "heartbeat monitor thread sleeping for " << HEARTBEAT_INTERVAL_MS << " ms";
-                std::this_thread::sleep_for(std::chrono::milliseconds{HEARTBEAT_INTERVAL_MS});
-                {
-                    std::scoped_lock<std::mutex> scopedLock(peerHeartBeatMapMutex);
-                    for (auto &pair : peerHeartBeatMap) {
-                        VLOG(1) << "PeerId: " << pair.first << ", heartBeatCount: " << pair.second;
-                        auto peerCrashed = pair.second == 0;
-                        pair.second--;
-                        if (peerCrashed) {
-                            PeerId crashedPeerId = pair.first;
-                            CHECK_EQ(peerHeartBeatMap.erase(crashedPeerId), 1);
-                            LOG(WARNING) << "Peer " << crashedPeerId << " not reachable";
-                            if (myPeerId == leaderPeerId) {
-                                modifyGroupMembership(crashedPeerId, OperationTypeEnum::DEL);
-                            } else if (crashedPeerId == leaderPeerId) {
-                                LOG(WARNING) << "Leader " << crashedPeerId << " has crashed";
-                                {
-                                    std::scoped_lock<std::mutex> lock(leaderCrashedMutex);
-                                    leaderCrashed = true;
-                                }
-                                leaderCrashedCV.notify_one();
-                            }
-                            // breaking out of the loop since the iterator is invalidated due to modification
-                            // of heartBeatReceivers set.
-                            // iterating using invalidated iterator results in undefined behavior
-                            break;
-                        }
+                try {
+                    startAsFollower();
+                } catch (const TransportException &e) {
+                    LOG(INFO) << "waiting for leader crash detection";
+                    {
+                        std::unique_lock<std::mutex> lock(leaderCrashedMutex);
+                        leaderCrashedCV.wait(lock, [&] { return leaderCrashed; });
+                        leaderCrashed = false;
                     }
+                    handleLeaderCrash();
                 }
             }
-        });
-
-        std::thread serviceThread([&]() {
-            VLOG(1) << "starting service thread";
-            findLeader();
-            LOG(INFO) << "leaderPeerId: " << leaderPeerId;
-            if (myPeerId == leaderPeerId) {
-                printNewlyInstalledView();
-                startListening();
-            } else {
-                while (true) {
-                    try {
-                        waitForMessagesFromLeader();
-                    } catch (const TransportException &e) {
-                        VLOG(1) << "waiting for leader crash detection";
-                        {
-                            std::unique_lock<std::mutex> lock(leaderCrashedMutex);
-                            leaderCrashedCV.wait(lock, [&] { return leaderCrashed; });
-                            leaderCrashed = false;
-                        }
-                        handleLeaderCrash();
-                    }
-                }
-            }
-        });
-
-        heartBeatReceiverThread.join();
-        failureDetectorThread.join();
-        serviceThread.join();
+        }
     }
-
-#pragma clang diagnostic pop
 }

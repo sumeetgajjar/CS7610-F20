@@ -65,4 +65,38 @@ namespace lab2 {
         std::uniform_real_distribution<double> distribution(min, max);
         return distribution(randomEngine);
     }
+
+    PeerId PeerInfo::myPeerId(-1);
+    std::vector<std::string> PeerInfo::allPeerHostnames;
+    std::unordered_map<std::string, PeerId> PeerInfo::hostnameToPeerIdMap;
+    std::unordered_map<PeerId, std::string> PeerInfo::peerIdToHostnameMap;
+
+
+    void PeerInfo::initialize(const std::string &myHostname, std::vector<std::string> allPeerHostnames_) {
+        allPeerHostnames = std::move(allPeerHostnames_);
+        for (const auto &hostname : allPeerHostnames) {
+            auto peerId = Utils::getProcessIdentifier(hostname, allPeerHostnames);
+            hostnameToPeerIdMap[hostname] = peerId;
+            peerIdToHostnameMap[peerId] = hostname;
+        }
+
+        myPeerId = hostnameToPeerIdMap.at(myHostname);
+        LOG(INFO) << "myPeerId: " << myPeerId;
+    }
+
+    PeerId PeerInfo::getMyPeerId() {
+        return myPeerId;
+    }
+
+    std::string PeerInfo::getHostname(const PeerId peerId) {
+        return peerIdToHostnameMap.at(peerId);
+    }
+
+    PeerId PeerInfo::getPeerId(const std::string &hostname) {
+        return hostnameToPeerIdMap.at(hostname);
+    }
+
+    const std::vector<std::string> &PeerInfo::getAllPeerHostnames() {
+        return allPeerHostnames;
+    }
 }
