@@ -264,22 +264,23 @@ namespace lab2 {
         for (const auto &hostname: PeerInfo::getAllPeerHostnames()) {
             auto peerId = PeerInfo::getPeerId(hostname);
             if (peerId == PeerInfo::getMyPeerId()) {
-                leaderPeerId = peerId;
-                return;
+                continue;
             }
 
             LOG(INFO) << "trying hostname: " << hostname << ", peerId: " << peerId << " as leader";
             try {
-                auto leaderTcpClient = TcpClient(hostname, membershipPort, 5);
+                auto leaderTcpClient = TcpClient(hostname, membershipPort, 0);
                 leaderPeerId = peerId;
                 tcpClientMap.insert(std::make_pair(leaderPeerId, leaderTcpClient));
+                LOG(INFO) << "found leader, leaderPeerId: " << leaderPeerId;
                 return;
             } catch (const std::runtime_error &e) {
                 LOG(INFO) << "unable to connect to peerId: " << peerId;
             }
         }
 
-        LOG(FATAL) << "no leader found";
+        leaderPeerId = PeerInfo::getMyPeerId();
+        LOG(INFO) << "no leader found, I am becoming the leader, leaderPeerId: " << leaderPeerId;
     }
 
     void MembershipService::handleLeaderCrash() {
@@ -380,7 +381,6 @@ namespace lab2 {
 
     void MembershipService::start() {
         findLeader();
-        LOG(INFO) << "leaderPeerId: " << leaderPeerId;
         if (PeerInfo::getMyPeerId() == leaderPeerId) {
             printNewlyInstalledView();
             startAsLeader();

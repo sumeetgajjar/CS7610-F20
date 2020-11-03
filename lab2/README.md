@@ -19,6 +19,7 @@ there are no messages left for multicast.
 Use `test_membership.py` to run the various test cases (**Recommended and requires python3**) <br/>
 It is a python script which uses `unittest` framework to test various multicasting and snapshotting scenarios. <br/>
 All the test cases are present under the `MembershipSuite` test suite.
+
 - Before running a test case, `MembershipSuite.setUp()` method is invoked by the unittest framework.
 Inside this method all the containers with name prefix `sumeet-g*` are stopped (`docker stop`) and then removed
 (`docker rm`).
@@ -62,7 +63,7 @@ So along with `docker logs`, logs are also present under `logs/<hostname>/lab2.I
 This redundancy of logs is to prevent loss of logs in case the docker container is unknowingly removed.
 
 **Manually start a container:**
- 
+
 Command: `HOST='<hostname>'; docker run --name "${HOST}" --network cs7610-bridge --hostname "${HOST}" sumeet-g-prj2 --v 0 --hostfile /hostfile  --leaderFailureDemo`
 - --v: Controls the verbosity of the logs. Possible values are: `[0, 1]`.
 Increasing the verbosity is only useful during the debugging phase but not in general.
@@ -73,7 +74,9 @@ It is not recommended to set this flag unless required.
 - --leaderFailureDemo: Setting this flag will turn on the leader failure mode, as mentioned in test case 4.<br/>
 When this flag is set for a peer and if the peer is the leader and is in middle of processing a Delete Operation then the
 following events occurs:
+
     - the leader sends the delete `RequestMsg` to all peers except `PeerId:2`
+
     - after sending the `RequestMsg` the leader exits before receiving any `OkMsg`.
 
 ### Stopping the docker containers
