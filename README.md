@@ -3,9 +3,9 @@
 This report contains all the Labs and Homeworks for the Foundation of Distributed Systems course (CS7610).
 
 ## Labs
-- [Lab0](lab0)
-- [Lab1](lab1)
-- [Lab2](lab2)
+- [HeartBeat via UDP](lab0)
+- [Total Order Mutlicast using ISIS Algorithm](lab1)
+- [Membership Service with Failure Detector](lab2)
 
 ## Homeworks
 - [Hw1](hw1/hw1.pdf)
