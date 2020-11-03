@@ -7,6 +7,7 @@
 #include "utils.h"
 #include <glog/logging.h>
 #include <thread>
+#include <utility>
 
 namespace lab2 {
 
@@ -20,8 +21,10 @@ namespace lab2 {
         return requestMsg;
     }
 
-    MembershipService::MembershipService(int membershipPort)
-            : membershipPort(membershipPort), pendingRequest(getDummyPendingRequestMsg()) {}
+    MembershipService::MembershipService(int membershipPort, std::function<std::set<PeerId>(void)> alivePeersGetter_)
+            : membershipPort(membershipPort),
+              alivePeersGetter(std::move(alivePeersGetter_)),
+              pendingRequest(getDummyPendingRequestMsg()) {}
 
     std::set<PeerId> MembershipService::getGroupMembers() {
         std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
@@ -282,23 +285,11 @@ namespace lab2 {
     void MembershipService::handleLeaderCrash() {
         VLOG(1) << "inside handleLeaderCrash";
         tcpClientMap.clear();
-        auto nextLeader = [&]() {
-            auto groupMembers = getGroupMembers();
-            PeerId candidateLeaderId = PeerInfo::getMyPeerId();
-            // Traversing the sorted set in reverse order to the PeerId
-            for (auto it = groupMembers.rbegin(); it != groupMembers.rend(); it++) {
-                if (*it == leaderPeerId) {
-                    break;
-                }
-                /* Selecting the Peer who is next position from leader in the sorted set.
-                 * e.g. {1,2,3,4} -> 2 will be selected
-                 * e.g. {3,4} -> 4 will be selected
-                 * e.g. {4} -> 4 will be selected
-                 */
-                candidateLeaderId = *it;
-            }
-            return candidateLeaderId;
-        }();
+
+        auto leaderCandidates = alivePeersGetter();
+        leaderCandidates.insert(PeerInfo::getMyPeerId());
+        auto nextLeader = *leaderCandidates.begin();
+
         LOG(INFO) << "new leader candidate peerId: " << nextLeader;
         if (PeerInfo::getMyPeerId() == nextLeader) {
             LOG(INFO) << "I am the new leader";

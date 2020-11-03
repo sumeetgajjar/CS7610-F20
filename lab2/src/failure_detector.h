@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <mutex>
+#include <set>
 
 #include "message.h"
 
@@ -15,7 +16,7 @@
 namespace lab2 {
     class FailureDetector {
         const int heartBeatPort;
-        const std::function<void(PeerId)> onFailureCallback;
+        std::vector<std::function<void(PeerId)>> onFailureCallbacks;
 
         std::unordered_map<PeerId, int> peerHeartBeatMap;
         std::mutex peerHeartBeatMapMutex;
@@ -27,10 +28,13 @@ namespace lab2 {
         [[noreturn]] void startHeartBeatListener();
 
     public:
-        FailureDetector(int heartBeatPort,
-                        std::function<void(PeerId)> onFailureCallback);
+        explicit FailureDetector(int heartBeatPort);
 
         void start();
+
+        void addPeerFailureCallback(const std::function<void(PeerId)> &callback);
+
+        std::set<PeerId> getAlivePeers();
     };
 }
 

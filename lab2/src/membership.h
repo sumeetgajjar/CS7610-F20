@@ -12,6 +12,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <gflags/gflags.h>
+#include <functional>
 
 #include "message.h"
 #include "network_utils.h"
@@ -23,6 +24,7 @@ namespace lab2 {
 
     class MembershipService {
         const int membershipPort;
+        const std::function<std::set<PeerId>(void)> alivePeersGetter;
 
         PeerId leaderPeerId = 1;
         RequestId requestCounter = 1;
@@ -77,7 +79,7 @@ namespace lab2 {
 
     public:
 
-        explicit MembershipService(int membershipPort);
+        MembershipService(int membershipPort, std::function<std::set<PeerId>(void)> alivePeersGetter_);
 
         std::set<PeerId> getGroupMembers();
 

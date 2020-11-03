@@ -3,7 +3,6 @@
 //
 #include <glog/logging.h>
 #include <thread>
-#include <utility>
 
 #include "failure_detector.h"
 #include "utils.h"
@@ -12,10 +11,7 @@
 
 namespace lab2 {
 
-    lab2::FailureDetector::FailureDetector(const int heartBeatPort,
-                                           std::function<void(PeerId)> onFailureCallback) :
-            heartBeatPort(heartBeatPort),
-            onFailureCallback(std::move(onFailureCallback)) {}
+    lab2::FailureDetector::FailureDetector(int heartBeatPort) : heartBeatPort(heartBeatPort) {}
 
     void FailureDetector::start() {
         std::thread heartBeatListenerThread([&]() {
@@ -58,7 +54,7 @@ namespace lab2 {
                 udpSender.send(buffer, sizeof(HeartBeatMsg));
                 udpSender.close();
             } catch (std::runtime_error &e) {
-                VLOG(1) << "exception occured while sending heartbeat msg to peerId: " << hostname;
+                VLOG(1) << "exception occurred while sending heartbeat msg to peerId: " << hostname;
             }
             VLOG(1) << "heartbeat sender for PeerId: " << peerId
                     << "  sleeping for " << HEARTBEAT_INTERVAL_MS << " ms";
@@ -80,7 +76,9 @@ namespace lab2 {
                         PeerId crashedPeerId = pair.first;
                         CHECK_EQ(peerHeartBeatMap.erase(crashedPeerId), 1);
                         LOG(WARNING) << "Peer: " << crashedPeerId << " is not reachable";
-                        onFailureCallback(crashedPeerId);
+                        for (const auto &callback : onFailureCallbacks) {
+                            callback(crashedPeerId);
+                        }
                         // breaking out of the loop since the iterator is invalidated due to modification
                         // of heartBeatReceivers set.
                         // iterating using invalidated iterator results in undefined behavior
@@ -109,5 +107,18 @@ namespace lab2 {
                 peerHeartBeatMap[heartBeatMsg.peerId] = 2;
             }
         }
+    }
+
+    std::set<PeerId> FailureDetector::getAlivePeers() {
+        std::set<PeerId> alivePeers;
+        std::scoped_lock<std::mutex> lock(peerHeartBeatMapMutex);
+        for (const auto &pair : peerHeartBeatMap) {
+            alivePeers.insert(pair.first);
+        }
+        return alivePeers;
+    }
+
+    void FailureDetector::addPeerFailureCallback(const std::function<void(PeerId)> &callback) {
+        onFailureCallbacks.push_back(callback);
     }
 }

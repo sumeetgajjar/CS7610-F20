@@ -35,8 +35,10 @@ int main(int argc, char **argv) {
 
     const auto hostnames = Utils::readHostFile(FLAGS_hostfile);
     PeerInfo::initialize(NetworkUtils::getCurrentHostname(), hostnames);
-    MembershipService membershipService(MEMBERSHIP_PORT);
-    FailureDetector failureDetector(HEARTBEAT_PORT, [&](PeerId crashedPeerId) {
+
+    FailureDetector failureDetector(HEARTBEAT_PORT);
+    MembershipService membershipService(MEMBERSHIP_PORT, [&]() { return failureDetector.getAlivePeers(); });
+    failureDetector.addPeerFailureCallback([&](PeerId crashedPeerId) {
         membershipService.handlePeerFailure(crashedPeerId);
     });
 
