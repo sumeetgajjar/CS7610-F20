@@ -58,7 +58,7 @@ crashes
 invoked when a peer crash is detected.
 
 ### Helper Classes
-- [PeerInfo](src/utils.hL29)
+- [PeerInfo](src/utils.h#L29)
     - Contains utility methods to get information about a peer given a `hostname` or a `peerId`.
 - [SerDe](src/serde.h)
     - Contains methods to serialize and deserialize all message types.

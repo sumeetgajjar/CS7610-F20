@@ -64,9 +64,9 @@ This redundancy of logs is to prevent loss of logs in case the docker container 
 **Manually start a container:**
  
 Command: `HOST='<hostname>'; docker run --name "${HOST}" --network cs7610-bridge --hostname "${HOST}" sumeet-g-prj2 --v 0 --hostfile /hostfile  --leaderFailureDemo`
-- --v: Controls the verbosity of the logs. Setting it to 1 will increase the amount of logs.
+- --v: Controls the verbosity of the logs. Possible values are: `[0, 1]`.
 Increasing the verbosity is only useful during the debugging phase but not in general.
-It is recommended to not set this flag to 1 unless required.
+It is not recommended to set this flag unless required.
 
 - --hostfile: The path of the hostfile inside the docker container
 

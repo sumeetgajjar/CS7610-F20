@@ -131,15 +131,21 @@ namespace lab2 {
         LOG(INFO) << "sending newLeaderMsg: " << newLeaderMsg;
         char buffer[sizeof(NewLeaderMsg)];
         SerDe::serializeNewLeaderMsg(newLeaderMsg, buffer);
-        for (const auto &peer : alivePeers) {
+        std::set<PeerId> tempAlivePeers;
+        std::scoped_lock<std::recursive_mutex> lock(alivePeersMutex);
+        for (const auto peer : alivePeers) {
             try {
                 auto client = TcpClient(PeerInfo::getHostname(peer), membershipPort, 5);
                 client.send(buffer, sizeof(NewLeaderMsg));
                 tcpClientMap.insert(std::make_pair(peer, client));
+                tempAlivePeers.insert(peer);
             } catch (const std::runtime_error &e) {
                 LOG(ERROR) << "cannot send newLeaderMsg to peerId: " << peer;
             }
         }
+
+        alivePeers.clear();
+        alivePeers.insert(tempAlivePeers.begin(), tempAlivePeers.end());
     }
 
     void MembershipService::processRequestMsg(const Message &rawReqMessage) {
@@ -275,16 +281,24 @@ namespace lab2 {
 
     void MembershipService::handleLeaderCrash() {
         VLOG(1) << "inside handleLeaderCrash";
-        tcpClientMap.erase(leaderPeerId);
+        tcpClientMap.clear();
         auto nextLeader = [&]() {
-            for (const auto peer : getGroupMembers()) {
-                if (peer != leaderPeerId) {
-                    return peer;
+            auto groupMembers = getGroupMembers();
+            PeerId candidateLeaderId = PeerInfo::getMyPeerId();
+            // Traversing the sorted set in reverse order to the PeerId
+            for (auto it = groupMembers.rbegin(); it != groupMembers.rend(); it++) {
+                if (*it == leaderPeerId) {
+                    break;
                 }
+                /* Selecting the Peer who is next position from leader in the sorted set.
+                 * e.g. {1,2,3,4} -> 2 will be selected
+                 * e.g. {3,4} -> 4 will be selected
+                 * e.g. {4} -> 4 will be selected
+                 */
+                candidateLeaderId = *it;
             }
-            return (PeerId) 0;
+            return candidateLeaderId;
         }();
-        CHECK_NE(nextLeader, 0);
         LOG(INFO) << "new leader candidate peerId: " << nextLeader;
         if (PeerInfo::getMyPeerId() == nextLeader) {
             LOG(INFO) << "I am the new leader";
