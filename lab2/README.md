@@ -11,13 +11,12 @@ submissions.
 - In case there are changes made to `hostfile`, please make sure to re-build the docker image before
 starting the containers.
 
-- Once started the containers will remain running unless explicitly stopped. The containers will be running even if
-there are no messages left for multicast.
+- Once started the containers will remain running unless explicitly stopped.
 
 
 #### How to run the testcases
 Use `test_membership.py` to run the various test cases (**Recommended and requires python3**) <br/>
-It is a python script which uses `unittest` framework to test various multicasting and snapshotting scenarios. <br/>
+It is a python script which uses `unittest` framework to test various scenarios. <br/>
 All the test cases are present under the `MembershipSuite` test suite.
 
 - Before running a test case, `MembershipSuite.setUp()` method is invoked by the unittest framework.
@@ -26,7 +25,7 @@ Inside this method all the containers with name prefix `sumeet-g*` are stopped (
 
 - After running a test case, `MembershipSuite.tearDown()` method is invoked by the unittest framework.
 Inside this method all the containers with name prefix `sumeet-g*` are stopped. The containers are not removed
-purposefully so that their logs can be accessed in case of a failure.
+purposefully so that their logs can be accessed in case of a test case failure.
 
 ##### Test Cases
 - membership service test cases
@@ -78,6 +77,8 @@ following events occurs:
     - the leader sends the delete `RequestMsg` to all peers except `PeerId:2`
 
     - after sending the `RequestMsg` the leader exits before receiving any `OkMsg`.
+
+    *Note:* Specifying this flag for multiple hosts may lead to multiple leader crashes.
 
 ### Stopping the docker containers
 Command: `./stop-docker-containers.sh`

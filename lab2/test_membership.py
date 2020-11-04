@@ -256,7 +256,10 @@ class MembershipSuite(BaseSuite):
     def test_case_4(self):
         initial_leader_host = self.HOSTS[0]
         new_leader_host = self.HOSTS[1]
+
+        # changing this value requires reanalyzing the "expected_view_installed" computation
         peer_to_stop = self.HOSTS[-1]
+
         self.__start_all_containers(leader_failure_demo=True)
 
         logging.info(f"crashing {peer_to_stop}")
@@ -268,19 +271,22 @@ class MembershipSuite(BaseSuite):
                                  lambda log_line: "crashing Leader purposefully for TestCase 4" not in log_line)
 
         # waiting for new view installation
-        self.__wait_for_new_view_delivery(new_leader_host, 1)
+        self.__wait_for_new_view_delivery(new_leader_host, 5)
+
+        # If there 5 peers, then expected view installations in peers P[1-5] by initial leader: [5,4,3,2,1]
+        #
+        # view installation in peers p[1-5] by new leader: [0,1,1,1,0],
+        # since P5 was crashed by the script and P1 crashed on its own.
+        #
+        # total view installations: [5,5,4,3,1]
+        expected_view_installed = list(reversed(range(1, len(self.HOSTS) + 1)))
+        for ix in range(1, len(self.HOSTS[:-1])):
+            expected_view_installed[ix] += 1
 
         actual_view_installed = []
         for host in self.HOSTS:
             actual_view_installed.append(sum([1 for line in self.get_container_logs(host)
                                               if self.NEW_VIEW_INSTALLED_SUBSTR in line]))
-
-        # If there 5 peers, then expected view installations in peers P[1-5] by initial leader: [5,4,3,2,1]
-        # view installation in peers p[1-5] by new leader: [0,1,1,1,0]
-        # total view installations: [5,5,4,3,1]
-        expected_view_installed = list(reversed(range(1, len(self.HOSTS) + 1)))
-        for ix in range(1, len(self.HOSTS[:-1])):
-            expected_view_installed[ix] += 1
 
         self.assertListEqual(expected_view_installed, actual_view_installed)
 
