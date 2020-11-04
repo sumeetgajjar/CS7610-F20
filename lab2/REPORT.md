@@ -4,7 +4,7 @@
 
 ### Assumptions
 
-- The system is designed to work with bounded number of peers. This is controlled by the
+- The system is designed to work a with bounded number of peers. This is controlled by the
 [MAX_PEERS](src/message.h#L12). <br/>
 For the purpose of this lab, this value is set to 10, it can be increased to a valid positive integer value.
 Changing this value requires recompilation of binaries.
@@ -22,15 +22,15 @@ The only exception is for the testcase of the leader failure as described in `te
 - ##### what happens when a peer starts?
 
     - When a peer starts, it tries looking for a leader. It does this by trying to establish a connection on
-    `MEMBERSHIP_PORT` with a peer with lowest `PeerId`. If successful that peer is considered as leader and this peer
-    becomes a follower.
+    `MEMBERSHIP_PORT` with all peers mentioned in the `hostfile` in that order except itself. If successful, the that
+    peer is considered the leader and this peer becomes a follower.
 
         ```
         I1103 23:04:00.389497     6 membership.cpp:270] trying hostname: sumeet-g-alpha, peerId: 1 as leader
         I1103 23:04:00.390352     6 membership.cpp:275] found leader, leaderPeerId: 1
         ```
 
-        If not it move-ons to the next peer in the list. Once it has tried all the peers except itself, it must
+        If unsuccessful it move-ons to the next peer in the list. Once it has tried all the peers except itself, it must
         become the leader.
 
         ```
@@ -51,6 +51,8 @@ The only exception is for the testcase of the leader failure as described in `te
         I1103 23:06:26.931890     6 membership.cpp:278] unable to connect to peerId: 6
         I1103 23:06:26.931903     6 membership.cpp:283] no leader found, I am becoming the leader, leaderPeerId: 1
         ```
+ 
+        Once connected to the leader, a peer now waits for messages from the leader
 
     - When a peer starts as a leader, it is the only peer in the group, it logs the following:
 
@@ -85,7 +87,7 @@ The only exception is for the testcase of the leader failure as described in `te
         ```
 
     - On receiving a `RequestMsg` message from a leader, a peer saves the `RequestMsg` message in
-    `RequestMsg pendingRequest;` Once the peer receives the `NewViewMsg` it clears the `pendingRequest` since it now
+    `RequestMsg pendingRequest;` Once the peer receives the `NewViewMsg` it clears the `pendingRequest` since it's now
     completed
 
         ```
@@ -107,37 +109,39 @@ The only exception is for the testcase of the leader failure as described in `te
 
 - ##### what happens if the Leader crashes?
 
-    - On detecting a leader crash, all peers determine the leader candidate. A peer who is alive and has the lowest
-    `PeerId` in the group becomes the leader. Once the leader candidate is determined, the corresponding peer sends the
-    `NewLeaderMsg` message to others and waits for `pendingRequestMsg` message. The new leader now completes the pending
-    request if any. While sending the `NewLeaderMsg` message if the new leader is not able to connect to some of the
-    peers then it removes them from the group.
+    - On detecting a leader crash, all peers determine the `nextLeader` candidate. A peer who is alive and has the
+    lowest `PeerId` in the group becomes the new leader. Once the leader candidate is determined, the corresponding peer
+    sends the `NewLeaderMsg` message to others and waits for `pendingRequestMsg` message. The new leader now completes
+    the pending request if any. While sending the `NewLeaderMsg` message if the new leader is not able to connect to
+    some of the peers then it removes them from the group.
         ```
-        W1103 23:07:25.034552    14 failure_detector.cpp:78] Peer: 1 is not reachable
-        W1103 23:07:25.034685    14 membership.cpp:373] Leader: 1 is not reachable
-        I1103 23:07:25.034814     6 membership.cpp:294] new leader candidate peerId: 2
-        I1103 23:07:25.034914     6 membership.cpp:296] I am the new leader
-        I1103 23:07:25.034946     6 membership.cpp:134] sending newLeaderMsg: msgType: NewLeaderMsg, requestId: 2, currentViewId: 6, operationType: PendingOperation
-        E1103 23:07:25.036283     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-gamma:10000
-        E1103 23:07:26.058779     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
-        E1103 23:07:27.097441     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
-        E1103 23:07:28.110874     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
-        E1103 23:07:29.123498     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
-        E1103 23:07:30.147599     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
-        E1103 23:07:31.166594     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
-        E1103 23:07:31.166733     6 membership.cpp:146] cannot send newLeaderMsg to peerId: 6
-        I1103 23:07:31.166817     6 membership.cpp:226] received pendingRequestMsg: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6, from peerId:3
-        I1103 23:07:31.166884     6 membership.cpp:226] received pendingRequestMsg: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6, from peerId:4
-        I1103 23:07:31.166911     6 membership.cpp:226] received pendingRequestMsg: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6, from peerId:5
-        I1103 23:07:31.166934     6 membership.cpp:304] completing pending request: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6
-        I1103 23:07:31.166952     6 membership.cpp:245] removed peerId: 6 from the group, GroupSize: 4
-        I1103 23:07:31.166978     6 membership.cpp:66] sending RequestMsg: msgType: RequestMsg, requestId: 3, currentViewId: 6, operationType: DelOperation, peerId: 6
-        I1103 23:07:31.167294     6 membership.cpp:189] received okMsg: msgType: OkMsg, requestId: 3, currentViewId: 6, from peerId: 3
-        I1103 23:07:31.167371     6 membership.cpp:189] received okMsg: msgType: OkMsg, requestId: 3, currentViewId: 6, from peerId: 4
-        I1103 23:07:31.167409     6 membership.cpp:189] received okMsg: msgType: OkMsg, requestId: 3, currentViewId: 6, from peerId: 5
-        I1103 23:07:31.167456     6 membership.cpp:366] installed view info, viewId: 7, members: {2, 3, 4, 5}
-        I1103 23:07:31.167503     6 membership.cpp:108] sending NewViewMsg: msgType: NewViewMsg, newViewId: 7, numberOfMembers: 4, members: {2, 3, 4, 5}
-        I1103 23:07:31.167706     6 membership.cpp:117] newViewMsg delivered to all peers
+        W1104 00:17:06.327698    14 failure_detector.cpp:78] Peer: 6 is not reachable
+        I1104 00:17:06.743966     6 membership.cpp:392] waiting for leader crash detection
+        W1104 00:17:09.328445    14 failure_detector.cpp:78] Peer: 1 is not reachable
+        W1104 00:17:09.328553    14 membership.cpp:373] Leader: 1 is not reachable
+        I1104 00:17:09.328686     6 membership.cpp:294] new leader candidate peerId: 2
+        I1104 00:17:09.328733     6 membership.cpp:296] I am the new leader
+        I1104 00:17:09.328763     6 membership.cpp:134] sending newLeaderMsg: msgType: NewLeaderMsg, requestId: 2, currentViewId: 6, operationType: PendingOperation
+        E1104 00:17:09.329665     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-gamma:10000
+        E1104 00:17:10.344696     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
+        E1104 00:17:11.359421     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
+        E1104 00:17:12.373231     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
+        E1104 00:17:13.387976     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
+        E1104 00:17:14.400880     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
+        E1104 00:17:15.414144     6 network_utils.cpp:291] tcp client failed to connect to host: sumeet-g-zeta:10000
+        E1104 00:17:15.414286     6 membership.cpp:146] cannot send newLeaderMsg to peerId: 6
+        I1104 00:17:15.414367     6 membership.cpp:226] received pendingRequestMsg: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6, from peerId:3
+        I1104 00:17:15.414403     6 membership.cpp:226] received pendingRequestMsg: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6, from peerId:4
+        I1104 00:17:15.414431     6 membership.cpp:226] received pendingRequestMsg: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6, from peerId:5
+        I1104 00:17:15.414456     6 membership.cpp:304] completing pending request: msgType: RequestMsg, requestId: 7, currentViewId: 6, operationType: DelOperation, peerId: 6
+        I1104 00:17:15.414485     6 membership.cpp:245] removed peerId: 6 from the group, GroupSize: 4
+        I1104 00:17:15.414523     6 membership.cpp:66] sending RequestMsg: msgType: RequestMsg, requestId: 3, currentViewId: 6, operationType: DelOperation, peerId: 6
+        I1104 00:17:15.414880     6 membership.cpp:189] received okMsg: msgType: OkMsg, requestId: 3, currentViewId: 6, from peerId: 3
+        I1104 00:17:15.415030     6 membership.cpp:189] received okMsg: msgType: OkMsg, requestId: 3, currentViewId: 6, from peerId: 4
+        I1104 00:17:15.415215     6 membership.cpp:189] received okMsg: msgType: OkMsg, requestId: 3, currentViewId: 6, from peerId: 5
+        I1104 00:17:15.415292     6 membership.cpp:366] installed view info, viewId: 7, members: {2, 3, 4, 5}
+        I1104 00:17:15.415323     6 membership.cpp:108] sending NewViewMsg: msgType: NewViewMsg, newViewId: 7, numberOfMembers: 4, members: {2, 3, 4, 5}
+        I1104 00:17:15.415509     6 membership.cpp:117] newViewMsg delivered to all peers
         ```
 
 ### FailureDetector
@@ -236,14 +240,14 @@ invoked when a peer crash is detected.
 
 ### Implementation Issues
 
-- serializing an deserializing varying size of group members while sending and receiving `NewViewMsg`
+- serializing and deserializing varying size of group members while sending and receiving `NewViewMsg`
 
     - A `std::vector` can be used to group members of varying sizes however it is not easy to serialize it.
 
-    - A `std::array` on the other hand can be easily serialized and deserialized. The only caveat is that its size
-    cannot be changed after initialization. Because of the earlier assumption of max group size being 10, a fixed size
-    `std::array<PeerId, 10> members` is declared in `NewViewMsg`. `NewViewMsg` also contains a field `numberOfMembers`
-    which helps in determining the number of members to access in the `members`.
+    - A `std::array` is used to solve this issue. It can be easily serialized and deserialized. The only caveat is that
+    its size cannot be changed after initialization. Because of the earlier assumption of max group size being 10, a
+    fixed size `std::array<PeerId, 10> members` is declared in `NewViewMsg`. `NewViewMsg` also contains a field
+    `numberOfMembers` which helps in determining the number of members to access in the `members`.
 
 ### Testing the MembershipService with FailureDetector
 
@@ -259,4 +263,4 @@ listed under [Test Cases](README.md#Test-Cases) section in README.md.
 method starts docker containers for each host mentioned in the `hostfile`. It waits for View change before starting the
 next container, this is to ensure only single event happens at a time. This is done by tailing and waiting for the view
 change message in the leader's logs. Once the control is returned from `MulticastSuite.__start_all_containers`, each
-test case simulates the corresponding scenarios and asserting on the corresponding conditions.
+test case simulates the corresponding scenarios and asserts on the corresponding conditions.

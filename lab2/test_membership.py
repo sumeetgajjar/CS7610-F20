@@ -271,7 +271,7 @@ class MembershipSuite(BaseSuite):
                                  lambda log_line: "crashing Leader purposefully for TestCase 4" not in log_line)
 
         # waiting for new view installation
-        self.__wait_for_new_view_delivery(new_leader_host, 5)
+        self.__wait_for_new_view_delivery(new_leader_host, 1)
 
         # If there 5 peers, then expected view installations in peers P[1-5] by initial leader: [5,4,3,2,1]
         #
