@@ -1,5 +1,10 @@
 # Membership Service with Failure Detector
 
+## State Diagram
+
+The state machine is as follows:
+![State Machine](lab2-state-machine.png)
+
 ## Architecture
 
 ### Assumptions
